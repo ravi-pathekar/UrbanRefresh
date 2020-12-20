@@ -16,9 +16,13 @@ const OrderSchema = new mongoose.Schema(
         },
         quantity: { type: Number, default: 1 },
         note: String,
-        // serviceDetails: {
-        //   type: String,
-        // },
+        serviceDetails: {
+          serviceSubCategoryName: String,
+          serviceCategoryName: String,
+          serviceName: String,
+          serviceProviderName: String,
+          price: Number,
+        },
         serviceProviderId: {
           type: mongoose.Schema.Types.ObjectId,
           required: true,
@@ -40,8 +44,13 @@ const OrderSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "coupon",
     },
+    couponValue: Number,
     orderStatus: String,
     totalPrice: Number,
+    userName: String,
+    userEmail: String,
+    userContactNo: String,
+    userMembershipType: String
   },
   {
     timestamps: true,
