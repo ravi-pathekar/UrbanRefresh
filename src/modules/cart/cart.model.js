@@ -23,13 +23,16 @@ const CartSchema = new mongoose.Schema(
           required: true,
         },
         note: String,
+        pricePerItem: {
+          type: Number,
+          required: true,
+        },
       },
     ],
-    couponsApplied: {
+    couponApplied: {
       type: mongoose.Schema.Types.ObjectId,
       required: true,
     },
-    totalPrice: Number,
   },
   {
     timestamps: true,

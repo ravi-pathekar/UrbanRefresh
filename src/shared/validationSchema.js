@@ -27,6 +27,22 @@ const authSchema = Joi.object({
   }),
 });
 
+const cartCheck = Joi.object({
+  userId: Joi.objectId().required(),
+  cartItems: Joi.array()
+    .items(
+      Joi.object({
+        serviceSubCategoryId: Joi.objectId().required(),
+        quantity: Joi.number().min(1).max(99).required(),
+        note: Joi.string().max(255).trim().truncate(),
+        pricePerItem: Joi.number().required(),
+      })
+    )
+    .required(),
+  couponApplied: Joi.objectId(),
+});
+
 module.exports = {
   authSchema,
+  cartCheck,
 };

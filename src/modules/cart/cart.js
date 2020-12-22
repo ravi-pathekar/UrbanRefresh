@@ -1,50 +1,103 @@
+const createError = require("http-errors");
 const CartModel = require("../cart/cart.model");
+const { cartCheck } = require("../../shared/validationSchema");
+const UserModel = require("../user/user.model");
+const CouponModel = require("../coupon/coupon.model");
 
 class Cart {
   static async addToCart(req, res, next) {
-    const { userId, cartItems } = req.body;
-    const doesExist = await CartModel.findOne({ userId: userId }).lean();
-    let updateCart = null;
-    if (doesExist) {
-      let classCartItems = doesExist.cartItems;
+    try {
+      const result = await cartCheck.validateAsync(req.body);
+      const doesExist = await CartModel.findOne({
+        userId: result.userId,
+      }).lean();
+      let updatedCart = null;
+      if (doesExist) {
+        let classCartItems = doesExist.cartItems;
 
-      for (let i = 0; i < classCartItems.length; i++) {
-        if (
-          classCartItems[i].serviceSubCategoryId ==
-          cartItems[0].serviceSubCategoryId
-        ) {
-          updateCart = await CartModel.findOneAndUpdate(
+        for (let i = 0; i < classCartItems.length; i++) {
+          if (
+            classCartItems[i].serviceSubCategoryId ==
+            result.cartItems[0].serviceSubCategoryId
+          ) {
+            if (classCartItems[i].quantity === 99)
+              throw createError.NotAcceptable(
+                "Product quantity should not be greater than 99!!!"
+              );
+            updatedCart = await CartModel.findOneAndUpdate(
+              {
+                userId: result.userId,
+                "cartItems.serviceSubCategoryId":
+                  classCartItems[i].serviceSubCategoryId,
+              },
+              {
+                $inc: { "cartItems.$.quantity": 1 },
+              },
+              { new: true }
+            );
+          }
+        }
+
+        if (!updatedCart) {
+          updatedCart = await CartModel.findOneAndUpdate(
+            { userId: result.userId },
             {
-              userId: userId,
-              "cartItems.serviceSubCategoryId":
-                classCartItems[i].serviceSubCategoryId,
+              $push: {
+                cartItems: {
+                  serviceSubCategoryId:
+                    result.cartItems[0].serviceSubCategoryId,
+                  quantity: 1,
+                  note: result.cartItems[0].note,
+                  pricePerItem: result.cartItems[0].pricePerItem,
+                },
+              },
             },
-            { $set: { "cartItems.$.quantity": cartItems[0].quantity } },
             { new: true }
           );
         }
+      } else {
+        updatedCart = await CartModel.insertMany(req.body);
       }
 
-      if (!updateCart) {
-        updateCart = await CartModel.findOneAndUpdate(
-          { userId: userId },
-          {
-            $push: {
-              cartItems: {
-                serviceSubCategoryId: cartItems[0].serviceSubCategoryId,
-                quantity: cartItems[0].quantity,
-                note: cartItems[0].note,
-              },
-            },
-          },
-          { new: true }
-        );
-      }
-      res.sendResponse(updateCart);
-    } else {
-      const savedCart = await CartModel.insertMany(req.body);
-      res.sendResponse(savedCart);
+      const totalPrice = await Cart.calculatePrice(updatedCart, result);
+
+      res.sendResponse({ updatedCart, totalPrice });
+    } catch (error) {
+      if (error.isJoi === true) error.status = 422;
+      next(error);
     }
+  }
+
+  static async calculatePrice(updatedCart, result) {
+    const { cartItems } = updatedCart;
+    let totalPrice = 0;
+    for (let i = 0; i < cartItems.length; i++) {
+      let total = cartItems[i].quantity * cartItems[i].pricePerItem;
+
+      totalPrice = totalPrice + total;
+    }
+    console.log(
+      "Output---------------------------> ~ file: cart.js ~ line 73 ~ Cart ~ calculatePrice ~ totalPrice",
+      totalPrice
+    );
+
+    const userDiscount = await UserModel.findOne({
+      _id: result.userId,
+    })
+      .populate("membershipType.membershipId")
+      .select("membershipType");
+
+    const membershipDiscount =
+      userDiscount.membershipType.membershipId.MembershipDiscount;
+
+    const coupon = await CouponModel.findOne({
+      _id: result.couponApplied,
+    }).select("couponValue");
+
+    const couponValue = coupon["couponValue"];
+
+    totalPrice = totalPrice - (membershipDiscount + couponValue);
+    return totalPrice;
   }
 }
 
