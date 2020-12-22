@@ -1,3 +1,4 @@
+const { string } = require("joi");
 const mongoose = require("mongoose");
 
 const OrderSchema = new mongoose.Schema(
@@ -18,39 +19,47 @@ const OrderSchema = new mongoose.Schema(
         note: String,
         serviceDetails: {
           serviceSubCategoryName: String,
-          serviceCategoryName: String,
-          serviceName: String,
+          serviceCategoryId: String,
+          serviceId: String,
           serviceProviderName: String,
           price: Number,
         },
-        serviceProviderId: {
-          type: mongoose.Schema.Types.ObjectId,
-          required: true,
-          ref: "serviceProvider",
+        serviceProviderDetails: {
+          providerName: {
+            type: String,
+            required: true,
+          },
+          contactNumber: {
+            type: String,
+            required: true,
+          },
         },
         deliveryDate: {
           type: Date,
           required: true,
         },
         deliveryTime: {
-          type: Date,
+          type: String,
           required: true,
         },
       },
     ],
+    orderNo: {
+      type: Number,
+      required: true,
+    },
     note: String,
     membershipDiscount: Number,
-    couponsApplied: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "coupon",
-    },
+    // couponsApplied: {
+    //   type: mongoose.Schema.Types.ObjectId,
+    //   ref: "coupon",
+    // },
     couponValue: Number,
     orderStatus: String,
     totalPrice: Number,
     userName: String,
     userEmail: String,
     userContactNo: String,
-    userMembershipType: String
   },
   {
     timestamps: true,
