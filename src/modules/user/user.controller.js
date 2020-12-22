@@ -1,23 +1,24 @@
 const express = require("express");
 const router = express.Router();
-const { verifyAccessToken } = require("../../shared/generateToken");
-const UserController = require("./user");
+const { verifyAccessToken } = require("../../shared/Tokens");
+const User = require("./user");
+
 // Register handle
-router.post("/register", UserController.register);
+router.post("/register", User.register);
 
 // Login handle
-router.post("/login", UserController.login);
+router.post("/login", User.login);
 
 // Refresh-token handle
-router.post("/refresh-token", UserController.refreshToken);
+router.post("/refresh-token", User.refreshToken);
 
 // Logout handle
-router.delete("/logout", UserController.logout);
+router.delete("/logout", verifyAccessToken, User.logout);
 
 // Reset Password
-router.post("/resetPassword", UserController.resetPassword);
+router.post("/resetPassword", User.resetPassword);
 
 // Update Password
-router.post("/updatePassword", UserController.updatePassword);
+router.post("/updatePassword", User.updatePassword);
 
 module.exports = router;

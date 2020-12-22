@@ -1,18 +1,15 @@
 const createError = require("http-errors");
 const crypto = require("crypto");
 const mongoose = require("mongoose");
-// const client = require("../helpers/init_mongodb")
-const User = require("./user.model");
-// const { authSchema } = require("../../shared/validationSchema");
+const UserModel = require("./user.model");
+const { authSchema } = require("../../shared/validationSchema");
 const {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
-} = require("../../shared/generateToken");
+} = require("../../shared/Tokens");
 const nodeMailer = require("nodemailer");
 const sendgridTransport = require("nodemailer-sendgrid-transport");
-
-// const client = require("../helpers/init_redis");
 
 const transporter = nodeMailer.createTransport(
   sendgridTransport({
@@ -23,31 +20,20 @@ const transporter = nodeMailer.createTransport(
   })
 );
 
-module.exports = {
-  register: async (req, res, next) => {
-    console.log("register----------------28------------>", req.body);
-
+class User {
+  static async register(req, res, next) {
     try {
-      // const { email, password } = req.body;
-      // if (!email || !password) throw createError.BadRequest();
-      // const result = await authSchema.validateAsync(req.body);
-      // console.log("Output-------------------------------------------> ~ file: Auth.Controller.js ~ line 32 ~ register: ~ result", result)
+      const result = await authSchema.validateAsync(req.body);
 
-      const doesExist = await User.findOne({ email: req.body.email });
-      console.log(
-        "Output-------------------------------------------> ~ file: Auth.Controller.js ~ line 35 ~ register: ~ doesExist",
-        doesExist
-      );
+      const doesExist = await UserModel.findOne({ email: result.email });
 
       if (doesExist) {
         throw createError.Conflict(
-          `${req.body.email} already been registered!!!`
+          `${result.email} already been registered!!!`
         );
       }
 
-      console.log("register----------------45------------>");
-
-      const user = new User(req.body);
+      const user = new UserModel(result);
       const savedUser = await user.save();
       const accessToken = await signAccessToken(savedUser.id);
       const refreshToken = await signRefreshToken(savedUser.id);
@@ -64,16 +50,16 @@ module.exports = {
 
       res.sendResponse({ savedUser, accessToken, refreshToken });
     } catch (error) {
-      // if (error.isJoi === true) error.status = 422;
+      if (error.isJoi === true) error.status = 422;
       next(error);
     }
-  },
-  login: async (req, res, next) => {
+  }
+
+  static async login(req, res, next) {
     try {
-      // const result = await authSchema.validateAsync(req.body);
       const { email, password } = req.body;
 
-      const user = await User.findOne({ email: email });
+      const user = await UserModel.findOne({ email: email });
 
       if (!user) throw createError.NotFound("User not registered!!!");
 
@@ -86,12 +72,11 @@ module.exports = {
 
       res.send({ accessToken, refreshToken });
     } catch (error) {
-      if (error.isJoi === true)
-        return next(createError.BadRequest("Invalid Username or Password!!!"));
-      next(error);
+      next(createError.BadRequest("Invalid Username or Password!!!"));
     }
-  },
-  refreshToken: async (req, res, next) => {
+  }
+
+  static async refreshToken(req, res, next) {
     try {
       const { refreshToken } = req.body;
       if (!refreshToken) throw createError.BadRequest();
@@ -104,40 +89,31 @@ module.exports = {
     } catch (error) {
       next(error);
     }
-  },
-  logout: async (req, res, next) => {
+  }
+
+  static async logout(req, res, next) {
     try {
       const { refreshToken } = req.body;
       if (!refreshToken) throw createError.BadRequest();
-      const userId = await verifyRefreshToken(refreshToken);
-      // client.DEL(userId, (err, val) => {
-      //   if (err) {
-      //     console.log(err.msg);
-      //     throw createError.InternalServerError();
-      //   }
-      //   console.log(val);
-      //   res.sendStatus(204);
-      // });
-      res.sendStatus(204);
+      // const userId = await verifyRefreshToken(refreshToken);
+      const message = "User Successfully Logged Out!!!";
+      res.sendResponse(message, 204, true);
     } catch (error) {
       next(error);
     }
-  },
-  resetPassword: async (req, res, next) => {
+  }
+  static async resetPassword(req, res, next) {
     try {
-      console.log("Authcont-----------------114-------------->");
+      const { email, refreshToken } = req.body;
 
-      // const { email } = req.body;
-
-      // if (!refreshToken) throw createError.BadRequest();
+      if (!refreshToken) throw createError.BadRequest();
 
       crypto.randomBytes(32, (err, bufffer) => {
         if (err) {
           console.log(err);
         }
         const cryptToken = bufffer.toString("hex");
-        User.findOne({ email: req.body.email }).then((user) => {
-          console.log("Authcont-----------------124-------------->", user);
+        UserModel.findOne({ email: email }).then((user) => {
           if (!user) {
             // throw createError.BadRequest();
             return res.status(422);
@@ -151,38 +127,42 @@ module.exports = {
               subject: "Password Reset",
               html: `
               <p>You requested for password request</p>
-              <h5>Click on this <a href='http://localhost:3000/auth/updatePassword/${cryptToken}'>link</a> to reset password</h5>`,
+              <h5>Click on this <a href='http://localhost:5050/user/updatePassword/${cryptToken}'>link</a> to reset password</h5>`,
             });
           });
         });
       });
 
-      // if (!doesExist) throw createError.BadRequest();
-
       // const userId = await verifyRefreshToken(refreshToken);
+      let message = "Password link has been sent to your email.";
+      res.sendResponse(message, 200, true);
     } catch (error) {
       next(error);
     }
-  },
-  updatePassword: async (req, res, next) => {
-    const newPassword = req.body.password;
-    const sentToken = req.body.cryptToken;
-    User.findOne({
-      passwordResetCode: sentToken,
+  }
+  static async updatePassword(req, res, next) {
+    const { password, cryptToken } = req.body;
+    if (password.length < 6)
+      throw createError.NotAcceptable(
+        "Password length should be greater than 6 characters"
+      );
+    UserModel.findOne({
+      passwordResetCode: cryptToken,
       resetExpiryDate: { $gt: Date.now() },
     })
       .then((user) => {
         if (!user) {
           return res.status(422);
         }
-        user.password = newPassword;
+        user.password = password;
         user.passwordResetCode = "";
         user.resetExpiryDate = null;
         user.save().then((savedUser) => {
-          console.log("Password Changed...", savedUser.password);
-          res.send("Password Changed!!!");
+          res.sendResponse("Password Changed!!!");
         });
       })
-      .catch((err) => console.log(err));
-  },
-};
+      .catch((err) => next(err));
+  }
+}
+
+module.exports = User;
