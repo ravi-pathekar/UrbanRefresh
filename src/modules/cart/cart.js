@@ -1,90 +1,50 @@
-const CartModel = require("./cart.model");
-const serviceSubCategoryModel = require("./../serviceSubCategory/serviceSubCategory.model");
+const CartModel = require("../cart/cart.model");
 
 class Cart {
-  static async addProductToCart(req, res) {
-    const { ServiceId, Quantity, customerId } = req.body;
+  static async addToCart(req, res, next) {
+    const { userId, cartItems } = req.body;
+    const doesExist = await CartModel.findOne({ userId: userId }).lean();
+    let updateCart = null;
+    if (doesExist) {
+      let classCartItems = doesExist.cartItems;
 
-    if (!ServiceId) {
-      res.status(400).send("Valiation Failed: ServiceId doesn't Exist");
-    }
-    if (Quantity <= 0) {
-      res.status(400).send("Quantity must be greater than zero");
-    }
+      for (let i = 0; i < classCartItems.length; i++) {
+        if (
+          classCartItems[i].serviceSubCategoryId ==
+          cartItems[0].serviceSubCategoryId
+        ) {
+          updateCart = await CartModel.findOneAndUpdate(
+            {
+              userId: userId,
+              "cartItems.serviceSubCategoryId":
+                classCartItems[i].serviceSubCategoryId,
+            },
+            { $set: { "cartItems.$.quantity": cartItems[0].quantity } },
+            { new: true }
+          );
+        }
+      }
 
-    if (!Quantity) {
-      res.status(400).send("Valiation Failed: Quantity");
-    }
-
-    const service = await new serviceSubCategoryModel().serviceSubCategory
-      .findOne({ _id: ServiceId })
-      .lean();
-
-    if (!service) {
-      console.log("Services not found");
-    }
-
-    const customerCart = await new CartModel().cart
-      .findOne({ CustomerId: customerId })
-      .lean();
-
-    if (customerCart) {
-      const arr = customerCart.CartItems;
-      arr.push(req.body);
-      const updatedCart = await new CartModel().cart
-        .findOneAndUpdate(
-          { CustomerId: customerId },
-          { $set: { CartItems: arr } }
-        )
-        .lean();
-
-      console.log("UPDATED CARTTT::", updatedCart);
+      if (!updateCart) {
+        updateCart = await CartModel.findOneAndUpdate(
+          { userId: userId },
+          {
+            $push: {
+              cartItems: {
+                serviceSubCategoryId: cartItems[0].serviceSubCategoryId,
+                quantity: cartItems[0].quantity,
+                note: cartItems[0].note,
+              },
+            },
+          },
+          { new: true }
+        );
+      }
+      res.sendResponse(updateCart);
     } else {
-      const cart = {
-        CustomerId: customerId,
-        CartItems: [req.body]
-      };
-      const updatedCart = await new CartModel().cart(cart).save();
+      const savedCart = await CartModel.insertMany(req.body);
+      res.sendResponse(savedCart);
     }
-    res.status(200).send("Service Has been added in the Cart");
-  }
-
-  static async getCustomerCart(req, res) {
-    // get customer id from cookies
-    const customerId = "5fbcc4cd2780d839d543486e";
-    const customerCart = await new CartModel().cart
-      .findOne({ CustomerId: customerId })
-      .lean();
-
-    res.status(200).send(customerCart);
-  }
-
-  static async updateCustomerCart(req, res) {
-    // get authenticate customer id from cookies
-    const customerId = "5fbcc4cd2780d839d543486e";
-    const { cartItemId } = req.params;
-
-    const customerCart = await new CartModel().cart
-      .findOneAndUpdate(
-        { CustomerId: customerId, "CartItems._id": cartItemId },
-        { $set: { CartItems: req.body } }
-      )
-      .lean();
-
-    res.send(req.params);
-  }
-
-  static async removeItemFromCart(req, res) {
-    const customerId = "5fbcc4cd2780d839d543486e";
-    const { cartItemId } = req.params;
-    const customerCart = await new CartModel().cart
-      .findOneAndUpdate(
-        { CustomerId: customerId },
-        { $pull: { CartItems: { _id: { $in: cartItemId } } } }
-      )
-      .lean();
-
-    res.send("Items Remove from cart");
   }
 }
 
