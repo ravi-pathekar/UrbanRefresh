@@ -17,7 +17,7 @@ const OrderRoute = require("./src/modules/orders/order.controller");
 const MembershipRoute = require("./src/modules/memberships/membership.controller");
 const CouponRoute = require("./src/modules/coupon/coupon.controller");
 const HomeRoute = require('./src/modules/home/home.controller')
-
+const FaqRoute = require("./src/modules/faq/faq.controller")
 // Database Connection
 new Mongo();
 
@@ -51,6 +51,8 @@ app.use("/membership", MembershipRoute);
 app.use("/coupon", CouponRoute);
 
 app.use('/home', HomeRoute)
+app.use('/', FaqRoute)
+
 
 // Error Middleware
 app.use((req, res, next) => {
