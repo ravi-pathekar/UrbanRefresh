@@ -2,7 +2,7 @@ const ServiceCategoryModel = require("./serviceCategory.model");
 
 class ServiceCategory {
   static async addServiceCategory(req, res, next) {
-    const addedServiceCategory = await ServiceCategoryModel.insertMany(
+    const addedServiceCategory = await ServiceCategoryModel.create(
       req.body
     );
 

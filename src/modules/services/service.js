@@ -7,7 +7,7 @@ class Service {
 
     console.log("cities-----------------8------>", cities);
 
-    const savedservice = await ServiceModel.insertMany({
+    const savedservice = await ServiceModel.create({
       serviceName,
       cities,
     });

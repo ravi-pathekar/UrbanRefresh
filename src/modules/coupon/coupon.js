@@ -2,7 +2,7 @@ const CouponModel = require("./coupon.model");
 
 class Coupon {
   static async addCoupon(req, res, next) {
-    const savedCoupon = await CouponModel.insertMany(req.body);
+    const savedCoupon = await CouponModel.create(req.body);
     res.sendResponse(savedCoupon);
   }
 

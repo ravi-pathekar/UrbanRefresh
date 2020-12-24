@@ -18,7 +18,7 @@ const MembershipSchema = new mongoose.Schema(
         },
       },
     ],
-    MembershipDiscount: Number,
+    membershipDiscount: Number,
   },
   {
     timestamps: true,

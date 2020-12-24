@@ -2,7 +2,7 @@ const MembershipModel = require("./membership.model");
 
 class Membership {
   static async addMembership(req, res, next) {
-    const savedMembership = await MembershipModel.insertMany(req.body);
+    const savedMembership = await MembershipModel.create(req.body);
 
     res.sendResponse(savedMembership);
   }

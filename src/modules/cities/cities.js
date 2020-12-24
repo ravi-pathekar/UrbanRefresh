@@ -4,7 +4,7 @@ class City {
   static async addCities(req, res, next) {
     const { cityName, countryName, currencyCode } = req.body;
 
-    const savedCity = await CityModel.insertMany({
+    const savedCity = await CityModel.create({
       cityName: cityName,
       countryName: countryName,
       currencyCode: currencyCode,
