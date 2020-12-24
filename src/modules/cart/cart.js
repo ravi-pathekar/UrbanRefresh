@@ -13,6 +13,10 @@ class Cart {
       }).lean();
       let updatedCart = null;
       if (doesExist) {
+        console.log(
+          "Output---------------------------> ~ file: cart.js ~ line 16 ~ Cart ~ addToCart ~ doesExist",
+          doesExist
+        );
         let classCartItems = doesExist.cartItems;
 
         for (let i = 0; i < classCartItems.length; i++) {
@@ -20,10 +24,11 @@ class Cart {
             classCartItems[i].serviceSubCategoryId ==
             result.cartItems[0].serviceSubCategoryId
           ) {
-            if (classCartItems[i].quantity === 99)
+            if (classCartItems[i].quantity === 5) {
               throw createError.NotAcceptable(
-                "Product quantity should not be greater than 99!!!"
+                "Product quantity should not be greater than 5!!!"
               );
+            }
             updatedCart = await CartModel.findOneAndUpdate(
               {
                 userId: result.userId,
@@ -39,6 +44,11 @@ class Cart {
         }
 
         if (!updatedCart) {
+          if (classCartItems.length === 5) {
+            throw createError.NotAcceptable(
+              "You can add only upto 5 items in your cart"
+            );
+          }
           updatedCart = await CartModel.findOneAndUpdate(
             { userId: result.userId },
             {
@@ -56,7 +66,7 @@ class Cart {
           );
         }
       } else {
-        updatedCart = await CartModel.insertMany(req.body);
+        updatedCart = await CartModel.create(req.body);
       }
 
       const totalPrice = await Cart.calculatePrice(updatedCart, result);
@@ -70,25 +80,34 @@ class Cart {
 
   static async calculatePrice(updatedCart, result) {
     const { cartItems } = updatedCart;
+    console.log(
+      "Output---------------------------> ~ file: cart.js ~ line 76 ~ Cart ~ calculatePrice ~ cartItems",
+      cartItems.length
+    );
     let totalPrice = 0;
+    console.log(
+      "Output---------------------------> ~ file: cart.js ~ line 75 ~ Cart ~ calculatePrice ~ totalPrice",
+      totalPrice
+    );
     for (let i = 0; i < cartItems.length; i++) {
       let total = cartItems[i].quantity * cartItems[i].pricePerItem;
 
       totalPrice = totalPrice + total;
     }
-    console.log(
-      "Output---------------------------> ~ file: cart.js ~ line 73 ~ Cart ~ calculatePrice ~ totalPrice",
-      totalPrice
-    );
 
     const userDiscount = await UserModel.findOne({
       _id: result.userId,
     })
-      .populate("membershipType.membershipId")
-      .select("membershipType");
+      .populate("membershipId")
+      .select("membershipId -_id");
+    console.log(
+      "Output---------------------------> ~ file: cart.js ~ line 83 ~ Cart ~ calculatePrice ~ userDiscount",
+      Object.keys(userDiscount)
+    );
 
     const membershipDiscount =
-      userDiscount.membershipType.membershipId.MembershipDiscount;
+      userDiscount.hasOwnProperty("membershipId") &&
+      userDiscount.membershipId.membershipDiscount;
 
     const coupon = await CouponModel.findOne({
       _id: result.couponApplied,
