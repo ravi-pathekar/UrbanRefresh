@@ -7,7 +7,6 @@ const bfj = require("bfj");
 class HandleRequest {
   constructor(request, response) {
     response.sendResponse = this.response(request, response);
-    console.log("HandleRequest/cons-----------------7------------------>");
   }
 
   response(request, response) {

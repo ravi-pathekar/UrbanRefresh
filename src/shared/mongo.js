@@ -15,6 +15,14 @@ class Mongo {
       useFindAndModify: false,
     };
 
+    const debug = true;
+
+    if (debug) {
+      mongoose.set("debug", { color: true });
+    } else {
+      mongoose.set("debug", false);
+    }
+
     global.Mongoose = mongoose;
 
     mongoose

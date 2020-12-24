@@ -20,11 +20,10 @@ const authSchema = Joi.object({
     state: Joi.string().lowercase().trim().max(100).required(),
     pinCode: Joi.string().lowercase().trim().max(10).required(),
   }).required(),
-  membershipType: Joi.object({
-    membershipId: Joi.objectId(),
-    startDate: Joi.date(),
-    endDate: Joi.date(),
-  }),
+  membershipId: Joi.objectId(),
+  membershipDays: Joi.number(),
+  startDate: Joi.date(),
+  endDate: Joi.date(),
 });
 
 const cartCheck = Joi.object({

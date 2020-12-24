@@ -16,7 +16,7 @@ const CartRoute = require("./src/modules/cart/cart.controller");
 const OrderRoute = require("./src/modules/orders/order.controller");
 const MembershipRoute = require("./src/modules/memberships/membership.controller");
 const CouponRoute = require("./src/modules/coupon/coupon.controller");
-const HomeRoute = require('./src/modules/home/home.controller')
+const HomeRoute = require("./src/modules/home/home.controller");
 
 // Database Connection
 new Mongo();
@@ -33,7 +33,6 @@ app.get("/", (req, res, next) => {
 
 // HandleRequest
 app.use((req, res, next) => {
-  console.log("Kaise hua........");
   new HandleRequest(req, res);
   next();
 });
@@ -50,7 +49,7 @@ app.use("/order", OrderRoute);
 app.use("/membership", MembershipRoute);
 app.use("/coupon", CouponRoute);
 
-app.use('/home', HomeRoute)
+app.use("/home", HomeRoute);
 
 // Error Middleware
 app.use((req, res, next) => {
