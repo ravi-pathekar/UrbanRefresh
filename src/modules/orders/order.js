@@ -8,123 +8,155 @@ const ServiceCategoryModel = require("../serviceCategory/serviceCategory.model")
 
 class Order {
   static async addOrder(req, res, next) {
-    console.log("payload-------------11--------------->", req.payload);
-    let orderData = {};
-    const {
-      userId,
-      couponsApplied,
-      servicesOrdered,
-      note,
-      couponValue,
-    } = req.body;
+    try {
+      // console.log("payload-------------11--------------->", req.payload);
+      let orderData = {};
+      const {
+        userId,
+        couponsApplied,
+        servicesOrdered,
+        note,
+        couponValue
+      } = req.body;
 
-    const userDetails = await UserModel.findOne({ _id: userId }).lean();
-    let serviceCity = userDetails.address.city;
-    const membershipDiscount = await MembershipModel.findOne({
-      _id: userDetails.membershipType.membershipId,
-    }).select("MembershipDiscount -_id");
+      //
+      const userDetails = await UserModel.findOne({ _id: userId }).lean();
+      let serviceCity = userDetails.address.city;
+      // const membershipDiscount = await MembershipModel.findOne({
+      //   _id: userDetails.membershipId
+      // }).select("membershipDiscount -_id");
 
-    orderData.userId = userId;
-    orderData.userName = userDetails.firstName + userDetails.lastName;
-    orderData.userEmail = userDetails.email;
-    orderData.userContactNo = userDetails.contactNumber;
-    orderData.membershipDiscount = membershipDiscount["MembershipDiscount"];
-    orderData.note = note;
-    orderData.couponValue = couponValue;
-    orderData.orderStatus = "Pending";
+      orderData.userId = userId;
+      orderData.userName = userDetails.firstName + userDetails.lastName;
+      orderData.userEmail = userDetails.email;
+      orderData.userContactNo = userDetails.contactNumber;
+      // orderData.membershipDiscount = membershipDiscount["membershipDiscount"];
+      orderData.note = note;
+      orderData.couponValue = couponValue;
+      orderData.orderStatus = "Pending";
 
-    // const couponValue = await CouponModel.findOne({
-    //   _id: couponsApplied,
-    // }).select("couponValue -_id");
-    // orderData.couponValue = couponValue["couponValue"];
+      // const couponValue = await CouponModel.findOne({
+      //   _id: couponsApplied,
+      // }).select("couponValue -_id");
+      // orderData.couponValue = couponValue["couponValue"];
 
-    orderData.servicesOrdered = [];
+      orderData.servicesOrdered = [];
 
-    let services = servicesOrdered;
+      let services = servicesOrdered;
+      const currentDate = await Order.getCurrentDate();
+      // let serviceDetails = {};
 
-    // let serviceDetails = {};
+      for (let i = 0; i < services.length; i++) {
+        const deliveryUnixtime =
+          new Date(servicesOrdered[0].deliveryDate).getTime() / 1000;
 
-    for (let i = 0; i < services.length; i++) {
-      let orderedService = {};
-      orderedService.serviceDetails = {};
-      orderedService.serviceProviderDetails = {};
-      // let service = []
-      let subServiceDetails = await ServiceSubCategoryModel.findOne({
-        _id: services[i].serviceSubCategoryId,
-      }).select("-_id -priceType");
+        if (services[i].quantity > 3) {
+          throw new Exception("ValidationError", "Max Quantiy upto 3");
+        }
+        if (currentDate > deliveryUnixtime) {
+          throw new Exception("DeliveryTimeError");
+        }
 
-      orderedService.serviceSubCategoryId = services[i].serviceSubCategoryId;
+        let orderedService = {};
+        orderedService.serviceDetails = {};
+        orderedService.serviceProviderDetails = {};
+        // let service = []
+        let subServiceDetails = await ServiceSubCategoryModel.findOne({
+          _id: services[i].serviceSubCategoryId
+        }).select("-_id -priceType");
 
-      orderedService.serviceDetails["serviceSubCategoryName"] =
-        subServiceDetails.serviceSubCategoryName;
+        orderedService.serviceSubCategoryId = services[i].serviceSubCategoryId;
 
-      orderedService.serviceDetails["serviceCategoryId"] =
-        subServiceDetails.serviceCategoryId;
+        orderedService.serviceDetails["serviceSubCategoryName"] =
+          subServiceDetails.serviceSubCategoryName;
 
-      orderedService.serviceDetails["price"] =
-        subServiceDetails.price[0].prices;
+        orderedService.serviceDetails["serviceCategoryId"] =
+          subServiceDetails.serviceCategoryId;
 
-      orderedService.quantity = services[i].quantity;
+        orderedService.serviceDetails["price"] =
+          subServiceDetails.price[0].prices;
 
-      orderedService.note = services[i].note;
+        orderedService.quantity = services[i].quantity;
 
-      orderedService.deliveryDate = services[i].deliveryDate;
+        orderedService.note = services[i].note;
 
-      orderedService.deliveryTime = services[i].deliveryTime;
+        orderedService.deliveryDate = services[i].deliveryDate;
 
-      let serviceId = await ServiceCategoryModel.findOne({
-        _id: subServiceDetails.serviceCategoryId,
-      }).select("parentServiceId");
+        orderedService.deliveryTime = services[i].deliveryTime;
 
-      orderedService.serviceDetails["serviceId"] = serviceId.parentServiceId;
+        let serviceId = await ServiceCategoryModel.findOne({
+          _id: subServiceDetails.serviceCategoryId
+        }).select("parentServiceId");
 
-      // Service Provider ---------------------------------------------------->
+        orderedService.serviceDetails["serviceId"] = serviceId.parentServiceId;
+        // console.log(
+        //   "Output---------------------------> ~ file: order.js ~ line 80 ~ Order ~ addOrder ~ orderedService",
+        //   orderedService
+        // );
 
-      let providerDetails = await ServiceProviderModel.findOne({
-        "address.city": serviceCity,
-        services: orderedService.serviceDetails.serviceId,
-      }).select("serviceProviderName contactNumber");
+        // Service Provider ---------------------------------------------------->
 
-      orderedService.serviceProviderDetails["providerName"] =
-        providerDetails.serviceProviderName;
+        const serviceProvider = await Order.checkServiceProvider(
+          servicesOrdered[0],
+          deliveryUnixtime
+        );
 
-      orderedService.serviceProviderDetails["contactNumber"] =
-        providerDetails.contactNumber;
+        if (!serviceProvider.length) {
+          console.log("All Service Provider are busy in this region");
+          res.sendResponse(
+            `All Service Provider are busy in this region on ${servicesOrdered[0].deliveryDate} `
+          );
+        }
 
-      orderedService.serviceDetails["serviceProviderName"] =
-        providerDetails.serviceProviderName;
+        const providerDetails = serviceProvider[0];
 
-      orderData.servicesOrdered.push(orderedService);
-    }
+        providerDetails && providerDetails.serviceProviderName;
 
-    let previousOrder = await OrderModel.findOne()
-      .sort({ createdAt: -1, _id: -1 })
-      .lean();
-    let nextOrder = 1;
+        orderedService.serviceProviderDetails["contactNumber"] =
+          providerDetails && providerDetails.contactNumber;
 
-    if (previousOrder) {
-      nextOrder = previousOrder.orderNo + 1;
-      if (nextOrder > 999) {
-        nextOrder = 1;
+        orderedService.serviceDetails["serviceProviderName"] =
+          providerDetails && providerDetails.serviceProviderName;
+        orderedService.serviceProviderDetails["providerName"] =
+          providerDetails && providerDetails.serviceProviderName;
+
+        orderedService;
+        orderData.servicesOrdered.push(orderedService);
+
+        const setBookedDate = await Order.setBookingDateInServiceProvider(
+          deliveryUnixtime,
+          providerDetails._id
+        );
       }
+
+      let previousOrder = await OrderModel.findOne()
+        .sort({ createdAt: -1, _id: -1 })
+        .lean();
+      let nextOrder = 1;
+
+      if (previousOrder) {
+        nextOrder = previousOrder.orderNo + 1;
+        if (nextOrder > 999) {
+          nextOrder = 1;
+        }
+      }
+
+      orderData.orderNo = nextOrder;
+
+      let savedOrder = await OrderModel.insertMany(orderData);
+
+      // let orderResponse = savedOrder[0]
+      // console.log("Output---------------------------> ~ file: order.js ~ line 87 ~ Order ~ addOrder ~ orderResponse", orderResponse.servicesOrdered)
+
+      // delete orderResponse.servicesOrdered["serviceDetails"]
+
+      // console.log("Output---------------------------> ~ file: order.js ~ line 91 ~ Order ~ addOrder ~ orderResponse", orderResponse.servicesOrdered)
+
+      // console.log("setBOOKED DATEEEE:::: ::-145", setBookedDate);
+      res.sendResponse(savedOrder);
+    } catch (err) {
+      res.status(400).send(err);
     }
-
-    orderData.orderNo = nextOrder;
-
-    let savedOrder = await OrderModel.insertMany(orderData);
-    console.log(
-      "Output---------------------------> ~ file: order.js ~ line 85 ~ Order ~ addOrder ~ savedOrder",
-      savedOrder
-    );
-
-    // let orderResponse = savedOrder[0]
-    // console.log("Output---------------------------> ~ file: order.js ~ line 87 ~ Order ~ addOrder ~ orderResponse", orderResponse.servicesOrdered)
-
-    // delete orderResponse.servicesOrdered["serviceDetails"]
-
-    // console.log("Output---------------------------> ~ file: order.js ~ line 91 ~ Order ~ addOrder ~ orderResponse", orderResponse.servicesOrdered)
-
-    res.sendResponse(savedOrder);
   }
 
   // static async calculation(req, res, next) {
@@ -151,6 +183,201 @@ class Order {
 
   //   res.sendResponse(allOrders);
   // }
+
+  static async setBookingDateInServiceProvider(deliveryDate, providerId) {
+    if (!deliveryDate) {
+      throw new Exception("ValidationError", "Delivery Date not found");
+    }
+    const addDate = await ServiceProviderModel.update(
+      { _id: providerId },
+      { $addToSet: { bookedon: deliveryDate } }
+    );
+    return addDate;
+  }
+
+  static async checkServiceProvider(servicesOrdered, deliveryDate) {
+    const getServiceId = await ServiceSubCategoryModel.findOne({
+      _id: servicesOrdered.serviceSubCategoryId
+    })
+      .populate("serviceCategoryId")
+
+    const serviceId = getServiceId.serviceCategoryId.parentServiceId;
+
+    const getproviders = await ServiceProviderModel.find({
+      $and: [
+        {
+          services: { $in: [serviceId] },
+          bookedon: { $exists: true, $nin: [deliveryDate] }
+        }
+      ]
+    });
+    return getproviders;
+  }
+
+  static async getCurrentDate() {
+    const utc = new Date().toJSON().slice(0, 10).replace(/-/g, "/");
+    const currentUnixtime = new Date(utc).getTime() / 1000;
+    return currentUnixtime;
+  }
 }
 
 module.exports = Order;
+
+// --- OLD CODE-----------
+
+// const OrderModel = require("./order.model");
+// const UserModel = require("../user/user.model");
+// const MembershipModel = require("../memberships/membership.model");
+// // const CouponModel = require("../coupon/coupon.model");
+// const ServiceSubCategoryModel = require("../serviceSubCategory/serviceSubCategory.model");
+// const ServiceProviderModel = require("../serviceProvider/serviceProvider.model");
+// const ServiceCategoryModel = require("../serviceCategory/serviceCategory.model");
+
+// class Order {
+//   static async addOrder(req, res, next) {
+//     console.log("payload-------------11--------------->", req.payload);
+//     let orderData = {};
+//     const {
+//       userId,
+//       couponsApplied,
+//       servicesOrdered,
+//       note,
+//       couponValue,
+//     } = req.body;
+
+//     const userDetails = await UserModel.findOne({ _id: userId }).lean();
+//     let serviceCity = userDetails.address.city;
+//     // const membershipDiscount = await MembershipModel.findOne({
+//     //   _id: userDetails.membershipType.membershipId,
+//     // }).select("MembershipDiscount -_id");
+
+//     orderData.userId = userId;
+//     orderData.userName = userDetails.firstName + userDetails.lastName;
+//     orderData.userEmail = userDetails.email;
+//     orderData.userContactNo = userDetails.contactNumber;
+//     // orderData.membershipDiscount = membershipDiscount["MembershipDiscount"];
+//     orderData.note = note;
+//     orderData.couponValue = couponValue;
+//     orderData.orderStatus = "Pending";
+
+//     // const couponValue = await CouponModel.findOne({
+//     //   _id: couponsApplied,
+//     // }).select("couponValue -_id");
+//     // orderData.couponValue = couponValue["couponValue"];
+
+//     orderData.servicesOrdered = [];
+
+//     let services = servicesOrdered;
+
+//     // let serviceDetails = {};
+
+//     for (let i = 0; i < services.length; i++) {
+//       let orderedService = {};
+//       orderedService.serviceDetails = {};
+//       orderedService.serviceProviderDetails = {};
+//       // let service = []
+//       let subServiceDetails = await ServiceSubCategoryModel.findOne({
+//         _id: services[i].serviceSubCategoryId,
+//       }).select("-_id -priceType");
+
+//       orderedService.serviceSubCategoryId = services[i].serviceSubCategoryId;
+
+//       orderedService.serviceDetails["serviceSubCategoryName"] =
+//         subServiceDetails.serviceSubCategoryName;
+
+//       orderedService.serviceDetails["serviceCategoryId"] =
+//         subServiceDetails.serviceCategoryId;
+
+//       orderedService.serviceDetails["price"] =
+//         subServiceDetails.price[0].prices;
+
+//       orderedService.quantity = services[i].quantity;
+
+//       orderedService.note = services[i].note;
+
+//       orderedService.deliveryDate = services[i].deliveryDate;
+
+//       orderedService.deliveryTime = services[i].deliveryTime;
+
+//       let serviceId = await ServiceCategoryModel.findOne({
+//         _id: subServiceDetails.serviceCategoryId,
+//       }).select("parentServiceId");
+
+//       orderedService.serviceDetails["serviceId"] = serviceId.parentServiceId;
+
+//       // Service Provider ---------------------------------------------------->
+
+//       let providerDetails = await ServiceProviderModel.findOne({
+//         "address.city": serviceCity,
+//         services: orderedService.serviceDetails.serviceId,
+//       }).select("serviceProviderName contactNumber");
+
+//       // orderedService.serviceProviderDetails["providerName"] =
+//       //   providerDetails.serviceProviderName;
+
+//       orderedService.serviceProviderDetails["contactNumber"] =
+//         providerDetails.contactNumber;
+
+//       orderedService.serviceDetails["serviceProviderName"] =
+//         providerDetails.serviceProviderName;
+
+//       orderData.servicesOrdered.push(orderedService);
+//     }
+
+//     let previousOrder = await OrderModel.findOne()
+//       .sort({ createdAt: -1, _id: -1 })
+//       .lean();
+//     let nextOrder = 1;
+
+//     if (previousOrder) {
+//       nextOrder = previousOrder.orderNo + 1;
+//       if (nextOrder > 999) {
+//         nextOrder = 1;
+//       }
+//     }
+
+//     orderData.orderNo = nextOrder;
+
+//     let savedOrder = await OrderModel.insertMany(orderData);
+//     console.log(
+//       "Output---------------------------> ~ file: order.js ~ line 85 ~ Order ~ addOrder ~ savedOrder",
+//       savedOrder
+//     );
+
+//     // let orderResponse = savedOrder[0]
+//     // console.log("Output---------------------------> ~ file: order.js ~ line 87 ~ Order ~ addOrder ~ orderResponse", orderResponse.servicesOrdered)
+
+//     // delete orderResponse.servicesOrdered["serviceDetails"]
+
+//     // console.log("Output---------------------------> ~ file: order.js ~ line 91 ~ Order ~ addOrder ~ orderResponse", orderResponse.servicesOrdered)
+
+//     res.sendResponse(savedOrder);
+//   }
+
+//   // static async calculation(req, res, next) {
+//   //   console.log("calculation----------------100------------>");
+//   //   let totalPrice = 0;
+//   //   for (let i = 0; i < cartitems.length; i++) {
+//   //     let a = cartitems[i].quantity * cartitems[i].price[0].prices;
+
+//   //     let b = membershipDiscount;
+
+//   //     let c = couponValue;
+
+//   //     totalPrice = totalPrice + a - b - c;
+//   //     console.log(
+//   //       "Output---------------------------> ~ file: order.js ~ line 109 ~ Order ~ calculation ~ totalPrice",
+//   //       totalPrice
+//   //     );
+//   //   }
+//   //   res.sendResponse({});
+//   // }
+
+//   // static async getOrder(req, res, next) {
+//   //   const allOrders = await OrderModel.find();
+
+//   //   res.sendResponse(allOrders);
+//   // }
+// }
+
+// module.exports = Order;
