@@ -16,8 +16,11 @@ const CartRoute = require("./src/modules/cart/cart.controller");
 const OrderRoute = require("./src/modules/orders/order.controller");
 const MembershipRoute = require("./src/modules/memberships/membership.controller");
 const CouponRoute = require("./src/modules/coupon/coupon.controller");
-const HomeRoute = require('./src/modules/home/home.controller')
-const FaqRoute = require("./src/modules/faq/faq.controller")
+const HomeRoute = require("./src/modules/home/home.controller");
+const FaqRoute = require("./src/modules/faq/faq.controller");
+const ServiceReview = require("./src/modules/reviewServices/ServiceReview.controller");
+const ServiceProviderReview = require("./src/modules/reviewProvider/serviceProviderReview.controller");
+
 // Database Connection
 new Mongo();
 
@@ -38,6 +41,9 @@ app.use((req, res, next) => {
   next();
 });
 
+global.EXCEPTIONS = require('./src/shared/exceptions.json');
+global.Exception = require('./src/shared/exception');
+
 // Routes
 app.use("/user", UserRoute);
 app.use("/service", ServiceRoute);
@@ -50,8 +56,10 @@ app.use("/order", OrderRoute);
 app.use("/membership", MembershipRoute);
 app.use("/coupon", CouponRoute);
 
-app.use('/home', HomeRoute)
-app.use('/', FaqRoute)
+app.use("/home", HomeRoute);
+app.use("/", FaqRoute);
+app.use("/", ServiceReview);
+app.use("/", ServiceProviderReview);
 
 
 // Error Middleware
@@ -64,8 +72,8 @@ app.use((err, req, res, next) => {
   res.send({
     error: {
       Status: err.status || 500,
-      message: err.message,
-    },
+      message: err.message
+    }
   });
 });
 

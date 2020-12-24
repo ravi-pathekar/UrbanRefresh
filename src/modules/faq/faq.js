@@ -6,6 +6,7 @@ class Faq {
       const faq = await new FaqModel().faq.find({}).lean();
       if (!faq) {
         // throw an error
+        throw new Exception("ValidationError", "Faqs not found");
       }
       res.sendResponse(faq);
     } catch (err) {
@@ -14,15 +15,13 @@ class Faq {
   }
 
   static async addMainFaq(req, res) {
-    console.log("ADDD MAIN FAQ------------");
-
     try {
       const { question, answer } = req.body;
       if (!question) {
-        // throw validatoin error
+        throw new Exception("ValidationError", "Reviews not found");
       }
       if (!answer) {
-        // throw validation error
+        throw new Exception("ValidationError", "Reviews not found");
       }
       const addFaq = await new FaqModel().faq(req.body).save();
       if (addFaq) {
@@ -35,13 +34,11 @@ class Faq {
 
   static async updateMainFaq(req, res) {
     try {
-      console.log("222222");
       const { faqId } = req.params;
 
       if (!faqId) {
-        // throw an error
+        throw new Exception("ValidationError", "FaqID not found");
       }
-      console.log("faqid::", faqId);
 
       const updateFaq = await new FaqModel().faq
         .updateOne({ _id: faqId }, req.body)
@@ -59,7 +56,7 @@ class Faq {
     try {
       const { faqId } = req.params;
       if (!faqId) {
-        // trow an error
+        throw new Exception("ValidationError", "FaqID not found");
       }
       const deleteFaq = await new FaqModel().faq
         .deleteOne({ _id: faqId })
