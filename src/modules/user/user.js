@@ -25,15 +25,22 @@ class User {
     try {
       const result = await authSchema.validateAsync(req.body);
 
-      const doesExist = await UserModel.findOne({ email: result.email });
+      const doesExist = await UserModel.findOne({ email: req.body.email });
 
       if (doesExist) {
         throw createError.Conflict(
-          `${result.email} already been registered!!!`
+          `${req.body.email} already been registered!!!`
         );
       }
 
-      const user = new UserModel(result);
+      if (req.body.membershipId) {
+        req.body.membershipStartDate = Date.now();
+        req.body.membershipEndDate =
+          req.body.membershipStartDate +
+          1000 * 60 * 60 * 24 * req.body.membershipDays;
+      }
+
+      const user = new UserModel(req.body);
       const savedUser = await user.save();
       const accessToken = await signAccessToken(savedUser.id);
       const refreshToken = await signRefreshToken(savedUser.id);
@@ -46,7 +53,7 @@ class User {
           subject: "registration success",
           html: "<p>Welcome to Urban Refresh.</p>",
         })
-        .then(() => console.log("email sent"));
+        .then(() => console.log("email sent!!!"));
 
       res.sendResponse({ savedUser, accessToken, refreshToken });
     } catch (error) {
@@ -163,6 +170,21 @@ class User {
       })
       .catch((err) => next(err));
   }
+
+  // static async endDate(req, res, next) {
+  //   let startDate = Date.now();
+  //   console.log(
+  //     "Output---------------------------> ~ file: user.js ~ line 169 ~ User ~ endDate ~ startDate",
+  //     startDate
+  //   );
+  //   const endDate = startDate + 1000 * 60 * 60 * 24 * 28;
+  //   console.log(
+  //     "Output---------------------------> ~ file: user.js ~ line 171 ~ User ~ endDate ~ endDate",
+  //     endDate
+  //   );
+
+  //   res.sendResponse({});
+  // }
 }
 
 module.exports = User;

@@ -31,16 +31,21 @@ const UserSchema = new mongoose.Schema(
       state: { type: String, required: true, lowercase: true },
       pinCode: { type: String, required: true },
     },
-    membershipType: {
-      membershipId: {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: "membership",
+    membershipId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "membership",
+    },
+    membershipStartDate: {
+      type: Date,
+      required: function () {
+        if (this.membershipId) return true;
       },
-      startDate: {
-        type: Date,
-        default: Date.now,
+    },
+    membershipEndDate: {
+      type: Date,
+      required: function () {
+        if (this.membershipId) return true;
       },
-      endDate: Date,
     },
     passwordResetCode: {
       type: String,

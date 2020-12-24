@@ -21,4 +21,6 @@ router.post("/resetPassword", User.resetPassword);
 // Update Password
 router.post("/updatePassword", User.updatePassword);
 
+// router.get("/enddate", User.endDate);
+
 module.exports = router;
