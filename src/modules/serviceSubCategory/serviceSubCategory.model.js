@@ -4,6 +4,7 @@ const ServiceSubCategorySchema = new mongoose.Schema(
   {
     serviceSubCategoryName: {
       type: String,
+      lowercase: true,
       required: true,
     },
     serviceCategoryId: {

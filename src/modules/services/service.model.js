@@ -4,6 +4,7 @@ const ServiceSchema = new mongoose.Schema(
   {
     serviceName: {
       type: String,
+      lowercase: true,
       required: true,
     },
     cities: [

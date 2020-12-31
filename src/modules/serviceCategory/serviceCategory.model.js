@@ -4,6 +4,7 @@ const ServiceCategorySchema = new mongoose.Schema(
   {
     serviceCategoryName: {
       type: String,
+      lowercase: true,
       required: true,
     },
     parentServiceId: {
@@ -11,12 +12,6 @@ const ServiceCategorySchema = new mongoose.Schema(
       required: true,
       ref: "service",
     },
-    // serviceSubCategories: [
-    //   {
-    //     type: mongoose.Schema.Types.ObjectId,
-    //     ref: "servicesubcategories",
-    //   },
-    // ],
   },
   {
     timestamps: true,

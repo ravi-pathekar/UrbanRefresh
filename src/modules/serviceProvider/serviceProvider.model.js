@@ -1,9 +1,60 @@
+// const mongoose = require("mongoose");
+
+// const ServiceProviderSchema = new mongoose.Schema(
+//   {
+//     serviceProviderName: {
+//       type: String,
+//       required: true,
+//     },
+//     contactNumber: {
+//       type: String,
+//       required: true,
+//     },
+//     email: {
+//       type: String,
+//       required: true,
+//     },
+//     image: String,
+//     address: {
+//       addressLine1: { type: String, required: true },
+//       addressLine2: { type: String },
+//       city: { type: String, required: true },
+//       state: { type: String, required: true },
+//       pinCode: { type: String, required: true },
+//     },
+//     services: [
+//       {
+//         type: String,
+//         required: true,
+//       },
+//     ],
+//   },
+//   {
+//     timestamps: true,
+//   }
+// );
+
+// const ServiceProvider = mongoose.model(
+//   "serviceProvider",
+//   ServiceProviderSchema
+// );
+
+// ServiceProviderSchema.pre("save", async function (next) {
+//   try {
+//     // logic for matching cities and services
+//     console.log("Service provider pre save---------------->");
+//   } catch (error) {}
+// });
+
+// module.exports = ServiceProvider;
+
 const mongoose = require("mongoose");
 
 const ServiceProviderSchema = new mongoose.Schema(
   {
     serviceProviderName: {
       type: String,
+      lowercase: true,
       required: true,
     },
     contactNumber: {
@@ -12,20 +63,27 @@ const ServiceProviderSchema = new mongoose.Schema(
     },
     email: {
       type: String,
+      lowercase: true,
       required: true,
     },
     image: String,
     address: {
-      addressLine1: { type: String, required: true },
-      addressLine2: { type: String },
-      city: { type: String, required: true },
-      state: { type: String, required: true },
+      addressLine1: { type: String, lowercase: true, required: true },
+      addressLine2: { type: String, lowercase: true },
+      city: { type: String, lowercase: true, required: true },
+      state: { type: String, lowercase: true, required: true },
       pinCode: { type: String, required: true },
     },
     services: [
       {
         type: String,
         required: true,
+      },
+    ],
+    bookedon: [
+      {
+        type: String,
+        // required: true,
       },
     ],
   },

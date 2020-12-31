@@ -4,6 +4,7 @@ const MembershipSchema = new mongoose.Schema(
   {
     membershipType: {
       type: String,
+      lowercase: true,
       required: true,
     },
     price: [

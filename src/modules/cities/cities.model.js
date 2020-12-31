@@ -4,6 +4,7 @@ const CitySchema = new mongoose.Schema(
   {
     cityName: {
       type: String,
+      lowercase: true,
       required: true,
     },
     countryName: {
