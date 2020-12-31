@@ -3,7 +3,7 @@ const ServiceSubCategoryModel = require("./serviceSubCategory.model");
 
 class ServiceSubCategory {
   static async addServiceSubCategory(req, res, next) {
-    const savedSubCategory = await ServiceSubCategoryModel.insertMany(req.body);
+    const savedSubCategory = await ServiceSubCategoryModel.create(req.body);
 
     res.sendResponse(savedSubCategory);
   }

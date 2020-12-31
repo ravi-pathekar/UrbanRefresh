@@ -17,6 +17,9 @@ const OrderRoute = require("./src/modules/orders/order.controller");
 const MembershipRoute = require("./src/modules/memberships/membership.controller");
 const CouponRoute = require("./src/modules/coupon/coupon.controller");
 const HomeRoute = require("./src/modules/home/home.controller");
+const ReviewRoute = require("./src/modules/review/review.controller");
+const FaqRoute = require("./src/modules/faq/faq.controller");
+const OrderTestRoute = require("./src/modules/orderTest/orderTest.controller");
 
 // Database Connection
 new Mongo();
@@ -48,6 +51,9 @@ app.use("/cart", CartRoute);
 app.use("/order", OrderRoute);
 app.use("/membership", MembershipRoute);
 app.use("/coupon", CouponRoute);
+app.use("/review", ReviewRoute);
+app.use("/faq", FaqRoute);
+app.use("/orderTest", OrderTestRoute);
 
 app.use("/home", HomeRoute);
 

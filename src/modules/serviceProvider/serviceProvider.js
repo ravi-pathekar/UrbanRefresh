@@ -2,7 +2,7 @@ const ServiceProviderModel = require("./serviceProvider.model");
 
 class ServiceProvider {
   static async addServiceProvider(req, res, next) {
-    const savedProvider = await ServiceProviderModel.insertMany(req.body);
+    const savedProvider = await ServiceProviderModel.create(req.body);
 
     res.sendResponse(savedProvider);
   }
