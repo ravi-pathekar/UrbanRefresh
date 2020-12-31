@@ -7,6 +7,11 @@ const CartSchema = new mongoose.Schema(
       ref: "user",
       required: true,
     },
+    serviceCategoryId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "serviceCategory",
+      required: true,
+    },
     cartItems: [
       {
         serviceSubCategoryId: {
@@ -15,14 +20,20 @@ const CartSchema = new mongoose.Schema(
           required: true,
         },
         image: String,
-        description: String,
+        description: {
+          type: String,
+          lowercase: true,
+        },
         quantity: {
           type: Number,
           max: 99,
           min: 1,
           required: true,
         },
-        note: String,
+        note: {
+          type: String,
+          lowercase: true,
+        },
         pricePerItem: {
           type: Number,
           required: true,
