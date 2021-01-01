@@ -342,25 +342,3 @@ class Order {
 }
 
 module.exports = Order;
-
-// Tommorow
-
-// 1. servicesOrdered me same items ko dekhna hai
-// 2. serviceSubCategory se price lekr total dikhana hai  //complete
-// 3.. membership hai to or km krna hai                    //complete
-
-// phir servicesOrdered ki parent serviceCategory lena hai agr wo same hai to hi order jaye
-
-// Coupon appliies hai to price reduce krna hai
-
-// *****************************************************************************************************
-// 1.Cuopon value
-// 2.service Provider
-// 3.Cuopon Applied
-
-// Validation lgana hai checkServiceProvider
-// sbhi servicesOrdered ki parentId se match krna hai agr wo bhi serviceOrdered ki same hai to order ho
-
-// coupon available hai to total price km krna hai //
-// serviceProvider or services ki city same ho   //Implemened in getServiceSubCategoryDetails function
-//Date validation current Date se piche ka order na ho // implemented
