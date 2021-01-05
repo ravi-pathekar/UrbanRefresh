@@ -27,7 +27,6 @@ const authSchema = Joi.object({
 });
 
 const cartCheck = Joi.object({
-  userId: Joi.objectId().required(),
   serviceCategoryId: Joi.objectId().required(),
   cartItems: Joi.array()
     .items(
