@@ -2,12 +2,12 @@ const express = require("express");
 const router = express.Router();
 const Cart = require("./cart");
 
-router.post("/addToCart", Cart.addToCart);
+router.post("/v1/addToCart", Cart.addToCart);
 
-router.delete("/deleteItemFromCart", Cart.deleteItemFromCart);
+router.delete("/v1/deleteItemFromCart", Cart.deleteItemFromCart);
 
-router.delete("/deleteCart", Cart.deleteCart);
+router.delete("/v1/deleteCart", Cart.deleteCart);
 
-router.put("/decreaseItemQuantity", Cart.decreaseItemQuantity);
+router.put("/v1/decreaseItemQuantity", Cart.decreaseItemQuantity);
 
 module.exports = router;

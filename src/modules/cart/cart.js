@@ -7,9 +7,11 @@ const CouponModel = require("../coupon/coupon.model");
 class Cart {
   static async addToCart(req, res, next) {
     try {
-      const result = await cartCheck.validateAsync(req.body);
+      const userId = req.payload.aud;
+      let result = await cartCheck.validateAsync(req.body);
+      result.userId = userId;
       const doesExist = await CartModel.findOne({
-        userId: result.userId,
+        userId: userId,
         serviceCategoryId: result.serviceCategoryId,
       }).lean();
       let updatedCart = null;
@@ -28,7 +30,7 @@ class Cart {
             }
             updatedCart = await CartModel.findOneAndUpdate(
               {
-                userId: result.userId,
+                userId: userId,
                 "cartItems.serviceSubCategoryId":
                   classCartItems[i].serviceSubCategoryId,
               },
@@ -48,7 +50,7 @@ class Cart {
           }
           updatedCart = await CartModel.findOneAndUpdate(
             {
-              userId: result.userId,
+              userId: userId,
               serviceCategoryId: result.serviceCategoryId,
             },
             {
@@ -66,10 +68,10 @@ class Cart {
           );
         }
       } else {
-        updatedCart = await CartModel.create(req.body);
+        updatedCart = await CartModel.create(result);
       }
 
-      const totalPrice = await Cart.calculatePrice(updatedCart, result);
+      const totalPrice = await Cart.calculatePrice(updatedCart, userId, result);
 
       res.sendResponse({ updatedCart, totalPrice });
     } catch (error) {
@@ -78,7 +80,7 @@ class Cart {
     }
   }
 
-  static async calculatePrice(updatedCart, result) {
+  static async calculatePrice(updatedCart, userId, result) {
     try {
       const { cartItems } = updatedCart;
       let totalPrice = 0;
@@ -88,7 +90,7 @@ class Cart {
       }
 
       const userDiscount = await UserModel.findOne({
-        _id: result.userId,
+        _id: userId,
       })
         .populate("membershipId")
         .select("membershipId -_id");
@@ -115,12 +117,9 @@ class Cart {
 
   static async decreaseItemQuantity(req, res, next) {
     try {
-      const {
-        userId,
-        serviceCategoryId,
-        serviceSubCategoryId,
-        quantity,
-      } = req.body;
+      const userId = req.payload.aud;
+
+      const { serviceCategoryId, serviceSubCategoryId, quantity } = req.body;
 
       if (quantity === 0) {
         return await Cart.deleteItemFromCart(req, res, next);
@@ -146,7 +145,8 @@ class Cart {
 
   static async deleteItemFromCart(req, res, next) {
     try {
-      const { userId, serviceCategoryId, serviceSubCategoryId } = req.body;
+      const userId = req.payload.aud;
+      const { serviceCategoryId, serviceSubCategoryId } = req.body;
 
       const deletedItem = await CartModel.findOneAndUpdate(
         { userId: userId, serviceCategoryId: serviceCategoryId },
@@ -169,7 +169,9 @@ class Cart {
 
   static async deleteCart(req, res, next) {
     try {
-      const { userId, serviceCategoryId } = req.body;
+      const userId = req.payload.aud;
+
+      const { serviceCategoryId } = req.body;
 
       const deletedCart = await CartModel.findOneAndDelete({
         userId: userId,
