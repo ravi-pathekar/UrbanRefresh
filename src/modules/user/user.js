@@ -147,44 +147,81 @@ class User {
       next(error);
     }
   }
+
   static async updatePassword(req, res, next) {
-    const { password, cryptToken } = req.body;
-    if (password.length < 6)
-      throw createError.NotAcceptable(
-        "Password length should be greater than 6 characters"
-      );
-    UserModel.findOne({
-      passwordResetCode: cryptToken,
-      resetExpiryDate: { $gt: Date.now() },
-    })
-      .then((user) => {
-        if (!user) {
-          return res.status(422);
-        }
-        user.password = password;
-        user.passwordResetCode = "";
-        user.resetExpiryDate = null;
-        user.save().then((savedUser) => {
-          res.sendResponse("Password Changed!!!");
-        });
+    try {
+      const { password, cryptToken } = req.body;
+      if (password.length < 6)
+        throw createError.NotAcceptable(
+          "Password length should be greater than 6 characters"
+        );
+      UserModel.findOne({
+        passwordResetCode: cryptToken,
+        resetExpiryDate: { $gt: Date.now() },
       })
-      .catch((err) => next(err));
+        .then((user) => {
+          if (!user) {
+            return res.status(422);
+          }
+          user.password = password;
+          user.passwordResetCode = "";
+          user.resetExpiryDate = null;
+          user.save().then((savedUser) => {
+            res.sendResponse("Password Changed!!!");
+          });
+        })
+        .catch((err) => next(err));
+    } catch (error) {
+      next(error);
+    }
   }
 
   // static async endDate(req, res, next) {
   //   let startDate = Date.now();
-  //   console.log(
-  //     "Output---------------------------> ~ file: user.js ~ line 169 ~ User ~ endDate ~ startDate",
-  //     startDate
-  //   );
   //   const endDate = startDate + 1000 * 60 * 60 * 24 * 28;
-  //   console.log(
-  //     "Output---------------------------> ~ file: user.js ~ line 171 ~ User ~ endDate ~ endDate",
-  //     endDate
-  //   );
 
   //   res.sendResponse({});
   // }
+
+  static async updateProfile(req, res, next) {
+    try {
+      const userId = req.payload.aud;
+      const { firstName, lastName, address, email, contactNumber } = req.body;
+      let data = {};
+
+      if (firstName && firstName !== "") {
+        data.firstName = firstName;
+      }
+
+      if (lastName && lastName !== "") {
+        data.lastName = lastName;
+      }
+
+      if (email && email !== "") {
+        data.email = email;
+      }
+
+      if (address && address !== "") {
+        data.address = address;
+      }
+
+      if (contactNumber && contactNumber !== "") {
+        data.contactNumber = contactNumber;
+      }
+
+      const updatedUser = await UserModel.findOneAndUpdate(
+        { _id: userId },
+        data,
+        {
+          new: true,
+        }
+      ).select("-__v -createdAt -updatedAt -password");
+
+      res.sendResponse(updatedUser);
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = User;

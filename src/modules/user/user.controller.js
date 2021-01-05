@@ -4,23 +4,24 @@ const { verifyAccessToken } = require("../../shared/Tokens");
 const User = require("./user");
 
 // Register handle
-router.post("/register", User.register);
+router.post("/v1/register", User.register);
 
 // Login handle
-router.post("/login", User.login);
+router.post("/v1/login", User.login);
 
 // Refresh-token handle
-router.post("/refresh-token", User.refreshToken);
+router.post("/v1/refresh-token", User.refreshToken);
 
 // Logout handle
-router.delete("/logout", verifyAccessToken, User.logout);
+router.delete("/v1/logout", verifyAccessToken, User.logout);
 
 // Reset Password
-router.post("/resetPassword", User.resetPassword);
+router.post("/v1/resetPassword", User.resetPassword);
 
 // Update Password
-router.post("/updatePassword", User.updatePassword);
+router.post("/v1/updatePassword", User.updatePassword);
 
-// router.get("/enddate", User.endDate);
+// Update Profile
+router.put("/v1/updateProfile", verifyAccessToken, User.updateProfile);
 
 module.exports = router;
