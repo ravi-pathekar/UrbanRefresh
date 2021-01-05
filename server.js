@@ -4,6 +4,7 @@ const createError = require("http-errors");
 require("dotenv").config();
 const Mongo = require("./src/shared/mongo");
 const HandleRequest = require("./src/shared/handleRequest");
+const { verifyAccessToken } = require("./src/shared/Tokens");
 
 // Import Routes
 const UserRoute = require("./src/modules/user/user.controller");
@@ -40,6 +41,9 @@ app.use((req, res, next) => {
   next();
 });
 
+global.EXCEPTIONS = require("./src/shared/exceptions.json");
+global.Exception = require("./src/shared/exception");
+
 // Routes
 app.use("/user", UserRoute);
 app.use("/service", ServiceRoute);
@@ -47,8 +51,8 @@ app.use("/serviceCategory", ServiceCategoryRoute);
 app.use("/serviceSubCategory", ServiceSubCategoryRoute);
 app.use("/serviceProvider", ServiceProviderRoute);
 app.use("/city", CityRoute);
-app.use("/cart", CartRoute);
-app.use("/order", OrderRoute);
+app.use("/cart", verifyAccessToken, CartRoute);
+app.use("/order", verifyAccessToken, OrderRoute);
 app.use("/membership", MembershipRoute);
 app.use("/coupon", CouponRoute);
 app.use("/review", ReviewRoute);
