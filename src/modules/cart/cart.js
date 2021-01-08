@@ -12,10 +12,12 @@ class Cart {
       result.userId = userId;
       const doesExist = await CartModel.findOne({
         userId: userId,
-        serviceCategoryId: result.serviceCategoryId,
       }).lean();
       let updatedCart = null;
-      if (doesExist) {
+      if (
+        doesExist &&
+        doesExist.serviceCategoryId == result.serviceCategoryId
+      ) {
         let classCartItems = doesExist.cartItems;
 
         for (let i = 0; i < classCartItems.length; i++) {
@@ -35,7 +37,9 @@ class Cart {
                   classCartItems[i].serviceSubCategoryId,
               },
               {
-                $set: { "cartItems.$.quantity": result.cartItems[0].quantity },
+                $set: {
+                  "cartItems.$.quantity": result.cartItems[0].quantity,
+                },
               },
               { new: true }
             );
@@ -58,7 +62,7 @@ class Cart {
                 cartItems: {
                   serviceSubCategoryId:
                     result.cartItems[0].serviceSubCategoryId,
-                  quantity: 1,
+                  quantity: result.cartItems[0].quantity,
                   note: result.cartItems[0].note,
                   pricePerItem: result.cartItems[0].pricePerItem,
                 },
@@ -67,6 +71,22 @@ class Cart {
             { new: true }
           );
         }
+      } else if (
+        doesExist &&
+        doesExist.serviceCategoryId != result.serviceCategoryId
+      ) {
+        updatedCart = await CartModel.findOneAndUpdate(
+          {
+            userId: userId,
+          },
+          {
+            $set: {
+              serviceCategoryId: result.serviceCategoryId,
+              cartItems: result.cartItems,
+            },
+          },
+          { new: true }
+        );
       } else {
         updatedCart = await CartModel.create(result);
       }
@@ -81,38 +101,35 @@ class Cart {
   }
 
   static async calculatePrice(updatedCart, userId, result) {
-    try {
-      const { cartItems } = updatedCart;
-      let totalPrice = 0;
-      for (let i = 0; i < cartItems.length; i++) {
-        let total = cartItems[i].quantity * cartItems[i].pricePerItem;
-        totalPrice = totalPrice + total;
-      }
-
-      const userDiscount = await UserModel.findOne({
-        _id: userId,
-      })
-        .populate("membershipId")
-        .select("membershipId -_id");
-
-      const membershipDiscount =
-        userDiscount &&
-        userDiscount.membershipId &&
-        userDiscount.membershipId.membershipDiscount
-          ? userDiscount.membershipId.membershipDiscount
-          : 0;
-
-      const coupon = await CouponModel.findOne({
-        _id: result.couponApplied,
-      }).select("couponValue");
-
-      const couponValue = coupon["couponValue"];
-
-      totalPrice = totalPrice - (membershipDiscount + couponValue);
-      return totalPrice;
-    } catch (error) {
-      next(error);
+    const { cartItems } = updatedCart;
+    let totalPrice = 0;
+    for (let i = 0; i < cartItems.length; i++) {
+      let total = cartItems[i].quantity * cartItems[i].pricePerItem;
+      totalPrice = totalPrice + total;
     }
+
+    const userDiscount = await UserModel.findOne({
+      _id: userId,
+    })
+      .populate("membershipId")
+      .select("membershipId -_id");
+
+    const membershipDiscount =
+      userDiscount &&
+      userDiscount.membershipId &&
+      userDiscount.membershipId.membershipDiscount
+        ? userDiscount.membershipId.membershipDiscount
+        : 0;
+
+    const coupon = await CouponModel.findOne({
+      _id: result.couponApplied,
+      isActive: true,
+    }).select("couponValue");
+
+    const couponValue = coupon["couponValue"];
+
+    totalPrice = totalPrice - (membershipDiscount + couponValue);
+    return totalPrice;
   }
 
   static async decreaseItemQuantity(req, res, next) {
@@ -189,3 +206,8 @@ class Cart {
 }
 
 module.exports = Cart;
+
+// isvariant check in price
+// clear cartjb kisi nayo serviceCategory se dusri me jaye
+// Use aggregation
+// remove 2 phase commit
