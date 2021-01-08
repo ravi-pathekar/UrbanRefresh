@@ -5,6 +5,7 @@ const ServiceProviderModel = require("./../serviceProvider/serviceProvider.model
 const MembershipModel = require("./../memberships/membership.model");
 const CouponModel = require("./../coupon/coupon.model");
 const CityModel = require("./../cities/cities.model");
+
 class Order {
   static async addOrder(req, res) {
     try {
@@ -245,6 +246,11 @@ class Order {
         }
       ]
     ]);
+    
+    getproviders.sort(function (a, b) {
+      return a.bookedon.length - b.bookedon.length;
+    });
+
     return getproviders;
   }
 
