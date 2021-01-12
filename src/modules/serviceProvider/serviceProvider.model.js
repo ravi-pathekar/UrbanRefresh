@@ -30,7 +30,7 @@ const ServiceProviderSchema = new mongoose.Schema(
         required: true,
       },
     ],
-    bookedon: [
+    bookedOn: [
       {
         type: String,
         // required: true,
