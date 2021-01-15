@@ -1,0 +1,58 @@
+{
+  
+ 
+  "DeliveryTimeError":{
+    "name":"DeliveryTimeError",
+    "code":"4001",
+    "message":"Delivery Date not less than current Date",
+    "http_code":"400"
+  },
+  "ValidationError": {
+    "name": "ValidationError",
+    "code": "1001",
+    "message": "The fields that caused the problem are \"{parameters}\"",
+    "http_code": "400"
+  },
+  "ObjectNotFound": {
+    "name":"ObjectNotFound",
+    "code":"4002",
+    "message":"{message}",
+    "http_code":"400"
+  },
+  "UnAuthorizedUser":{
+    "name":"UnAuthorizedUser",
+    "code":"4003",
+    "message":"User has not in our database",
+    "http_code":"400"
+  },
+  "OrderError": {
+    "name":"OrderError",
+    "code":"4004",
+    "message":"{message}",
+    "http_code":"400"
+  },
+  "GeneralError": {
+    "name":"GeneralError",
+    "code":"4008",
+    "message":"An error occurred, please try again.",
+    "http_code":"400"
+  },
+  "NotInSameCityError":{
+    "name":"NotInSameCityError",
+    "code":"4007",
+    "message":"sevice provider or services not in same city.",
+    "http_code":"400"
+  } ,
+  "CouponExpire":{
+    "name":"CouponExpire",
+    "code":"4006",
+    "message":"Applied Coupon has Expired",
+    "http_code":"400"
+  } ,
+  "DeliveryDate":{
+    "name":"DeliveryDate",
+    "code":"4005",
+    "message":"{message}",
+    "http_code":"400"
+  } 
+}

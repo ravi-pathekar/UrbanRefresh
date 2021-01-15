@@ -51,6 +51,8 @@ const OrderSchema = new mongoose.Schema(
     couponValue: {
       type: Number
     },
+    serviceCategoryId: { type: String, required: true }, // done
+    serviceId: { type: String, required: true }, // done
 
     servicesOrdered: [
       {
@@ -61,13 +63,10 @@ const OrderSchema = new mongoose.Schema(
         },
         quantity: { type: Number, default: 1 },
         note: { type: String },
-        serviceDetails: {
-          serviceSubCategoryName: String,
-          serviceCategoryId: String,
-          serviceId: String,
-          serviceProviderName: String,
-          price: Number
-        }
+        // serviceDetails: {
+        serviceSubCategoryName: String,
+        price: Number
+        // }
       }
     ],
     serviceProviderDetails: {
@@ -107,7 +106,6 @@ const OrderSchema = new mongoose.Schema(
 const Order = mongoose.model("testingOrder", OrderSchema);
 
 module.exports = Order;
-
 
 
 

@@ -5,6 +5,28 @@ const ServiceProviderModel = require("./../serviceProvider/serviceProvider.model
 const MembershipModel = require("./../memberships/membership.model");
 const CouponModel = require("./../coupon/coupon.model");
 
+const templatesDir = `${__dirname}/../../../templates`;
+const ejs = require("ejs");
+
+const Nexmo = require("nexmo");
+
+const nodeMailer = require("nodemailer");
+const sendgridTransport = require("nodemailer-sendgrid-transport");
+
+const transporter = nodeMailer.createTransport(
+  sendgridTransport({
+    auth: {
+      api_key:
+        "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"
+    }
+  })
+);
+
+const nexmo = new Nexmo({
+  apiKey: "3fedf60f",
+  apiSecret: "TNgboaoKnEV7ootk"
+});
+
 class Order {
   static async addOrder(req, res) {
     try {
@@ -13,19 +35,17 @@ class Order {
         deliveryDate,
         deliveryTime,
         orderNote,
-        couponId
+        couponId,
+        address
       } = req.body;
 
-      // await Order.checkDeliveryMonth(deliveryDate);
-
       // get customerId from validation token
-      const customerId = "5fe0dc2e13f41353b584dacf";
+      const customerId = "5ff6d0e2d202e54baa3fe0a2";
 
       let newOrderNumbers = 1;
       let orderData = {};
-
+      let alertObj = {};
       const deliveryUnixtime = new Date(deliveryDate).getTime() / 1000;
-
       const currentDate = await Order.getCurrentDate();
 
       if (currentDate > deliveryUnixtime) {
@@ -39,13 +59,15 @@ class Order {
         );
       }
 
-      const customerValidation = await Order.validateCustomerDetails(
-        customerId
+      const customerDetails = await Order.validateCustomerDetails(
+        customerId,
+        address
       );
 
-      if (!customerValidation) {
+      if (!customerDetails) {
         throw new Exception("UnAuthorizedUser");
       }
+      await Order.checkDeliveryMonth(deliveryDate);
 
       const getOrders = await OrderModel.findOne().sort({ orderNumber: -1 });
 
@@ -65,12 +87,12 @@ class Order {
       }
 
       const orderServices = [];
-      let z = {};
+
       let serviceProviderDetails = {};
       let subTotal = 0;
 
       for (let i = 0; i < servicesOrdered.length; i++) {
-      let serviceOrderedObj = {};
+        let serviceOrderedObj = {};
 
         if (servicesOrdered[i].quantity > 5) {
           throw new Exception(
@@ -85,33 +107,29 @@ class Order {
         );
 
         serviceOrderedObj.quantity = servicesOrdered[i].quantity;
-        console.log("  serviceSubCategoryDetails.serviceSubCategoryName")
-        // service Details
-        z.serviceSubCategoryName =
-          serviceSubCategoryDetails.serviceSubCategoryName;
-        z.serviceCategoryId =
-          serviceSubCategoryDetails["serviceCategoryId"]._id;
-        z.price = serviceSubCategoryDetails.price[0].prices;
-        z.serviceId =
-          serviceSubCategoryDetails.serviceCategoryId.parentServiceId._id;
-        z.serviceProviderName = serviceProvider[0].serviceProviderName;
-        serviceOrderedObj.note = servicesOrdered[i].note;
 
-        // Merge Objects
-        serviceOrderedObj.serviceDetails = z;
+        serviceOrderedObj.serviceSubCategoryName =
+          serviceSubCategoryDetails.serviceSubCategoryName;
+        orderData.serviceCategoryId =
+          serviceSubCategoryDetails["serviceCategoryId"]._id;
+        serviceOrderedObj.price = parseInt(servicesOrdered[i].Price);
+
+        
+        orderData.serviceId =
+          serviceSubCategoryDetails.serviceCategoryId.parentServiceId._id;
+
+        serviceOrderedObj.note = servicesOrdered[i].note;
 
         serviceOrderedObj.serviceSubCategoryId =
           servicesOrdered[i].serviceSubCategoryId;
-        //  console.log("serviceOrderedObj serviceOrderedObj",serviceOrderedObj)
+
         subTotal +=
-          serviceSubCategoryDetails.price[0].prices *
-          servicesOrdered[i].quantity;
-        console.log("\n\nSerrviceorderedObj",serviceOrderedObj)
+        parseInt(servicesOrdered[i].Price) *
+          parseInt(servicesOrdered[i].quantity);
+
         orderServices.push(serviceOrderedObj);
-        console.log("orderServices:::",orderServices)
       }
 
-      // Provider Detail
       if (serviceProvider.length) {
         serviceProviderDetails.providerName =
           serviceProvider[0].serviceProviderName;
@@ -120,21 +138,27 @@ class Order {
       }
 
       orderData.orderNumber = newOrderNumbers;
-      orderData.userDetails = customerValidation;
+      orderData.userDetails = customerDetails;
       orderData.orderNote = orderNote;
       orderData.serviceProviderDetails = serviceProviderDetails;
       orderData.servicesOrdered = orderServices;
 
-      const membershipDiscount = await Order.checkUserMembership(
-        customerValidation.customerMembershipId
-      );
-      if (membershipDiscount) {
-        orderData.membershipDiscount = membershipDiscount;
-        subTotal = subTotal - membershipDiscount;
+      if (customerDetails.customerMembershipEndDate) {
+        if (currentDate < customerDetails.customerMembershipEndDate) {
+          const membershipDiscount = await Order.checkUserMembership(
+            customerDetails.customerMembershipId
+          );
+          if (membershipDiscount) {
+            orderData.membershipDiscount = membershipDiscount;
+            subTotal = subTotal - membershipDiscount;
+          }
+        } else {
+          alertObj.membershipExpired = "Your membership has expired";
+        }
       }
 
       if (couponId) {
-        const couponDiscount = await Order.checkCoupon();
+        const couponDiscount = await Order.checkCoupon(couponId);
         if (couponDiscount) {
           orderData.couponValue = couponDiscount;
           subTotal = subTotal - couponDiscount;
@@ -142,23 +166,29 @@ class Order {
         }
       }
       orderData.totalPrice = subTotal;
-
+      await Order.convertUnixToRealTime(deliveryUnixtime);
       await Order.setBookingDateInServiceProvider(
         deliveryUnixtime,
         serviceProvider[0]._id
       );
+
       orderData.deliveryDate = deliveryDate;
+
       const createOrder = await new OrderModel(orderData).save();
       if (!createOrder) {
         throw new Exception("OrderError");
       }
-      res.sendResponse(createOrder);
+
+      await Order.orderNotification_Mail(createOrder);
+      await Order.orderNotification_Message(createOrder);
+      res.sendResponse({ createOrder, alertObj });
+      res.sendResponse(alertObj);
     } catch (err) {
       res.status(400).send(err);
     }
   }
 
-  static async validateCustomerDetails(customerId) {
+  static async validateCustomerDetails(customerId, address) {
     const customer = await UserModel.findOne({
       _id: customerId
     });
@@ -178,11 +208,27 @@ class Order {
     if (customer && customer.contactNumber) {
       customerDetails.contactNumber = customer.contactNumber;
     }
-    if (customer && customer.address) {
+    if (address) {
+      customerDetails.deliveryAddress = address;
+    } else {
       customerDetails.deliveryAddress = customer.address;
     }
-    customerDetails.customerMembershipId = customer.membershipType.membershipId;
-
+    if (customer.membershipType) {
+      customerDetails.customerMembershipId =
+        customer.membershipType.membershipId;
+    }
+    if (
+      customer &&
+      customer.membershipType &&
+      customer.membershipType.endDate
+    ) {
+      const utc = customer.membershipType.endDate
+        .toJSON()
+        .slice(0, 10)
+        .replace(/-/g, "/");
+      const endDateUnix = new Date(utc).getTime() / 1000;
+      customerDetails.customerMembershipEndDate = endDateUnix;
+    }
     return customerDetails;
   }
 
@@ -194,10 +240,6 @@ class Order {
       populate: { path: "parentServiceId" }
     });
 
-    // const
-    // const providrCity = serviceProviderDetail[0].address.cityId;
-    // const serviceCities =
-    //   getSubCategory.serviceCategoryId.parentServiceId.cities;
     if (!getSubCategory) {
       throw new Exception(
         "ObjectNotFound",
@@ -205,17 +247,6 @@ class Order {
       );
     }
 
-    // const check = serviceCities.map(service => {
-    //   if (service === providrCity) {
-    //     return true;
-    //   } else {
-    //     return false;
-    //   }
-    // });
-    // console.log("CHECKKKKKKKKKKKKKKKKK:::", check);
-    // if (!check) {
-    //   throw new Exception("NotInSameCityError");
-    // }
     return getSubCategory;
   }
 
@@ -224,8 +255,10 @@ class Order {
       _id: servicesOrdered.serviceSubCategoryId
     }).populate("serviceCategoryId");
 
+    if (!getServiceId) {
+    }
     const serviceId = getServiceId.serviceCategoryId.parentServiceId;
-
+    serviceId.toString();
     const getproviders = await ServiceProviderModel.find({
       $and: [
         {
@@ -234,6 +267,13 @@ class Order {
         }
       ]
     });
+
+ 
+
+    getproviders.sort(function (a, b) {
+      return a.bookedon.length - b.bookedon.length;
+    });
+
     return getproviders;
   }
 
@@ -241,11 +281,11 @@ class Order {
     if (!deliveryDate) {
       throw new Exception("ValidationError", "Delivery Date not found");
     }
-
     const addDate = await ServiceProviderModel.updateOne(
       { _id: providerId },
       { $addToSet: { bookedon: deliveryDate } }
     );
+
     return addDate;
   }
 
@@ -253,7 +293,9 @@ class Order {
     const membership = await MembershipModel.findOne({
       _id: membershipId
     }).lean();
-    // if(!membership){}
+    if (!membership) {
+      console.log("USer has not taken any Memebership ");
+    }
     return membership.MembershipDiscount;
   }
 
@@ -262,22 +304,20 @@ class Order {
       // getCustomerId via user login token
       const customerId = "5fe0dc2e13f41353b584dacf";
 
-      const customerValidation = await Order.validateCustomerDetails(
-        customerId
-      );
+      const customerDetails = await Order.validateCustomerDetails(customerId);
 
-      if (!customerValidation) {
+      if (!customerDetails) {
         throw new Exception("UnAuthorizedUser");
       }
 
       const orders = await OrderModel.find({
-        "userDetails.userId": customerValidation.userId
+        "userDetails.userId": customerDetails.userId
       })
         .lean()
         .sort({ orderNumber: -1 });
 
       if (!orders.length) {
-        res.sendResponse("No items in the cart", res);
+        res.sendResponse("No items in the cart");
       }
 
       res.sendResponse(orders);
@@ -288,10 +328,27 @@ class Order {
 
   static async updateOrderStatus(req, res) {
     try {
+
       // get Customer Id as a token
       const userId = "5fe0dc2e13f41353b584dacf";
       const { Status } = req.body;
       const { orderId } = req.params;
+
+      if (Status === 5) {
+        const orders = await OrderModel.findOne({
+          $and: [{ _id: orderId }, { "userDetails.userId": userId }]
+        }).lean();
+
+        if(!orders){
+          console.log("Customer has no order with this id..")
+        }
+        if (orders.orderStatus === 5) {
+          throw new Exception("OrderError", "Order already cancelled");
+        }
+
+        await Order.cancelOrder(orders);
+        await Order.orderNotification_CancelMail(orders);
+      }
 
       const updateOrderStatus = await OrderModel.updateOne(
         { $and: [{ _id: orderId }, { "userDetails.userId": userId }] },
@@ -314,8 +371,7 @@ class Order {
   }
 
   static async checkCoupon(couponId) {
-    const cId = "5fe1a5c4481d0e5a1e391ebc";
-    const getCoupon = await CouponModel.findOne({ _id: cId });
+    const getCoupon = await CouponModel.findOne({ _id: couponId });
 
     if (Date.now() > Date.parse(getCoupon.endTime)) {
       throw new Exception("CouponExpire");
@@ -323,22 +379,83 @@ class Order {
     return getCoupon.couponValue;
   }
 
-  // static async checkDeliveryMonth(deliveryDate) {
-  //   console.log("DELIVERRYYY DATEEE", deliveryDate);
-  //   const currentDate = await Order.getCurrentDate();
-  //   const inUnixTime = new Date(deliveryDate).getTime()/1000;
-  //   const dateAfter60Days = currentDate + 1000 * 60 * 60 * 24 * 60;
-  //   console.log("%%%%%%%", dateAfter60Days);
+  static async checkDeliveryMonth(deliveryDate) {
+    const currentDate = await Order.getCurrentDate();
+    const inUnixTime = new Date(deliveryDate).getTime() / 1000;
+    const dateAfter60Days = currentDate + 60 * 60 * 24 * 30;
 
-  //   console.log(
-  //     " currentDate < inUnixTime",
-  //     currentDate < inUnixTime && dateAfter60Days > inUnixTime
-  //   );
-  //   console.log("dateAfter60Days > inUnixTime", dateAfter60Days < inUnixTime);
-  //   console.log("---334-----",currentDate < inUnixTime && dateAfter60Days < inUnixTime);
-  //   // if (currentDate < deliveryUnixtime && dateAfter60Days < inUnixTime) {
-  //   // }
-  // }
+    if (currentDate < inUnixTime && dateAfter60Days < inUnixTime) {
+      throw new Exception(
+        "DeliveryDate",
+        "Delivery Date not more than 30 days"
+      );
+    }
+  }
+
+  static async convertUnixToRealTime(unixDate) {
+    const inUnixTime = new Date(unixDate * 1000);
+  }
+
+  static async cancelOrder(orders) {
+    const serviceProviderId = orders.serviceProviderDetails.serviceProviderId;
+
+    const utc = new Date(orders.deliveryDate)
+      .toJSON()
+      .slice(0, 10)
+      .replace(/-/g, "-");
+    const deliveryDate = new Date(utc).getTime() / 1000;
+
+    const provider = await ServiceProviderModel.findOneAndUpdate(
+      {
+        $and: [
+          { _id: serviceProviderId },
+          { bookedon: { $exists: true, $in: [deliveryDate] } }
+        ]
+      },
+      { $pull: { bookedon: { $in: [deliveryDate] } } }
+    );
+  }
+
+  static async orderNotification_Message(order) {
+    // const deliveryDate = order.deliveryDate.toISOString().substring(0, 10);
+    // const from = "Vonage APIs";
+    // const to = "917905689433";
+    // const text = `Hello ${order.userDetails.username}
+    //               Service Placed : Your UrbanRefresh service has been placed with order Number ${order.orderNumber} and the  Price has been charged :${order.totalPrice} Your service delivery date by ${deliveryDate}. We will send you an update on service regards`;
+    // nexmo.message.sendSms(from, to, text);
+  }
+
+  static async orderNotification_Mail(order) {
+    const emailTemplate = await ejs.renderFile(
+      templatesDir + "/order/order.ejs",
+      { order: order }
+    );
+
+    transporter.sendMail({
+      to: "rishabkhare314@gmail.com",
+      from: "ravipathekar99@gmail.com",
+      subject: "Order Has Been Placeed Succesfully",
+      html: emailTemplate
+    });
+  }
+  static async orderNotification_CancelMail(order) {
+    const cancelTemplate = await ejs.renderFile(
+      templatesDir + "/order/cancel.ejs",
+      { order: order }
+    );
+
+    transporter.sendMail({
+      to: "jatinj2327@gmail.com",
+      from: "ravipathekar99@gmail.com",
+      subject: "Order Has Been Cancelled Succesfully",
+      html: cancelTemplate
+    });
+
+    // const from = "Vonage APIs";
+    // const to = "917905689433";
+    // const text = `Hello ${order.userDetails.username}, \nService Cancelled :Your UrbanRefresh service has been cancelled with order Number ${order.orderNumber} as per your request.
+    //               `;
+    // nexmo.message.sendSms(from, to, text);
+  }
 }
-
 module.exports = Order;
