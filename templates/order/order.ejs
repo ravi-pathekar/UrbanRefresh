@@ -1,0 +1,264 @@
+<!DOCTYPE html
+    PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+    <meta http-equiv="content-type" content="text/html; charset=iso-8859-1" />
+    <meta name="format-detection" content="address=no" />
+    <title>Product Updates</title>
+
+    <style type="text/css">
+        /* body {
+            margin: 0;
+            padding: 0;
+        }
+
+        .content-text {
+            color: #324061;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 15px;
+            line-height: 24px;
+        }
+
+        .sub-title {
+            color: #17274D;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 20px;
+            font-weight: 700;
+        }
+
+        ul {
+            margin: 0;
+            padding: 0 0 0 20px;
+        }
+
+        .button {
+            -webkit-border-radius: 4px;
+            -moz-border-radius: 4px;
+            border-radius: 4px;
+            padding: 12px 25px;
+            background-color: #1F62FF;
+        }
+
+        a.button-text {
+            text-align: center;
+            display: block;
+            vertical-align: middle;
+            font-family: Verdana, Arial, Helvetica, sans-serif;
+            text-decoration: none;
+            font-size: 16px;
+            outline: none;
+            color: #ffffff;
+        }
+
+        @media only screen and (max-width:600px) {
+            .outer-container {
+                width: 100% !important;
+            }
+
+            .view-browser {
+                display: block;
+                width: 100%;
+                text-align: left;
+                margin-top: 15px;
+            }
+
+            .logo-section {
+                display: block;
+                width: 100%;
+            }
+
+            .container,
+            .fullwidth {
+                width: 100% !important;
+                margin: auto !important;
+            }
+
+            .extraheight {
+                height: 15px !important;
+            }
+
+            .extrawidth {
+                width: 15px !important;
+            }
+
+            .label {
+                padding: 0 0 10px !important;
+            }
+
+            table[class=header-table] {
+                display: block !important;
+                width: 100% !important;
+            }
+
+            table[class=header-table] tbody,
+            table[class=header-table] tbody tr,
+            table[class=header-table] tbody tr td {
+                display: block !important;
+                width: 100% !important;
+                text-align: left !important;
+            }
+
+            table[class=header-table] tbody tr td[class=view-browser] {
+                margin: 10px 0 0 !important;
+            }
+
+
+            table[class=main-table] {
+                display: block !important;
+                width: 100% !important;
+                padding: 0 15px !important;
+            }
+
+
+            table[class=main-table] tbody,
+            table[class=main-table] tbody tr,
+            table[class=main-table] tbody tr td {
+                display: block !important;
+                width: 100% !important;
+            }
+
+
+            table[class=main-table-image],
+            table[class=main-table-image] tbody,
+            table[class=main-table-image] tbody tr,
+            table[class=main-table-image] tbody tr td {
+                display: block !important;
+                width: 100% !important;
+            }
+
+            table[class=main-table-content],
+            table[class=main-table-content] tbody,
+            table[class=main-table-content] tbody tr {
+                display: block !important;
+                width: 100% !important;
+            }
+
+            table[class=main-content] {
+                display: block !important;
+                width: 100% !important;
+            }
+
+            table[class=main-content]>tbody,
+            table[class=main-content]>tbody>tr,
+            table[class=main-content]>tbody>tr>td {
+                display: block !important;
+                width: 100% !important;
+            }
+
+            table[class=fullwidth] {
+                width: 100% !important;
+            }
+
+            table[class=fullwidth] tbody,
+            table[class=fullwidth] tbody tr,
+            table[class=fullwidth] tbody tr td {
+                display: block !important;
+                width: 100% !important;
+                text-align: left !important;
+            }
+
+            .border-radius-0 {
+                border-radius: 0 !important;
+            }
+
+            br {
+                display: none !important;
+            }
+
+            .padding-top {
+                padding-top: 10px !important;
+            }
+
+            .rounded-button {
+                width: 90% !important;
+                display: block !important;
+            }
+
+        } */
+
+        table {
+            font-family: arial, sans-serif;
+            border-collapse: collapse;
+            width: 100%;
+            text-align: center !important;
+        }
+
+        td,
+        th {
+            border: 1px solid #dddddd;
+            text-align: center;
+            padding: 8px;
+        }
+
+        tr:nth-child(even) {
+            background-color: #dddddd;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="reset-password" style="
+        border: 10px solid #000;
+        width: 740px;
+        margin-left: auto;
+        margin-right: auto;
+      ">
+        <div class="block">
+
+            <div style="padding: 10px; font-size: 18px">
+                <p>Hello, <%= order.userDetails.username %></p>
+                <p>
+                    Your UrbanRefresh service has been placed with order Number <%=
+            order.orderNumber %> and the Price has been charged &#8377; <%=
+            order.totalPrice %> Your service delivery date by <%=
+            order.deliveryDate.toISOString().substring(0, 10) %>. We will send
+                    you an update on service regards
+                </p>
+
+                <table style="text-align: center;">
+                    <tr>
+                        <th>Service Name</th>
+                        <th>Quantity</th>
+                        <th>Price Per Quantity</th>
+                    </tr>
+
+
+                    <% order.servicesOrdered.forEach(function(item){ %>
+
+                    <tr>
+                        <td><%= item.serviceSubCategoryName %></td>
+                        <td><%= item.quantity %></td>
+                        <td><%= item.price %></td>
+                    </tr>
+
+                    <% }) %>
+
+                    <% if (order.membershipDiscount) { %>
+                    <tr>
+                        <td colspan="2" style="text-align: right;">Membership Discount</td>
+
+                        <td><strong> - </strong><%= order.membershipDiscount %></td>
+                    </tr>
+                    <% } %> <% if (order.couponsApplied) { %>
+                    <tr>
+                        <td colspan="2" style="text-align: right;">Coupon Discount</td>
+
+                        <td><strong> - </strong><%= order.couponValue %></td>
+                    </tr>
+                    <% } %>
+                    <tr>
+                        <td colspan="2" style="text-align: right;">Total Price</td>
+
+                        <td><%= order.totalPrice %></td>
+                    </tr>
+                </table>
+
+                <p>Cheers</p>
+                <p>Team Urban Refresh</p>
+            </div>
+        </div>
+    </div>
+</body>
+
+</html>
