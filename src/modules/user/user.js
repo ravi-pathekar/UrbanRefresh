@@ -1,61 +1,57 @@
 const createError = require("http-errors");
 const crypto = require("crypto");
-const mongoose = require("mongoose");
 const UserModel = require("./user.model");
-const { authSchema } = require("../../shared/validationSchema");
+const {
+  registerValidate,
+  loginValidate,
+} = require("../../shared/validationSchema");
 const {
   signAccessToken,
   signRefreshToken,
   verifyRefreshToken,
-} = require("../../shared/Tokens");
-const nodeMailer = require("nodemailer");
-const sendgridTransport = require("nodemailer-sendgrid-transport");
-
-const transporter = nodeMailer.createTransport(
-  sendgridTransport({
-    auth: {
-      api_key:
-        "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",
-    },
-  })
-);
+} = require("../../shared/tokens");
+const { sendMail } = require("../../shared/mailer");
+// const { sendMessage } = require("../../shared/textMessage");
+const templatesDir = `${__dirname}/../../../templates`;
+const ejs = require("ejs");
 
 class User {
   static async register(req, res, next) {
     try {
-      const result = await authSchema.validateAsync(req.body);
+      const result = await registerValidate.validateAsync(req.body);
+      const { email, membershipId } = result;
 
-      const doesExist = await UserModel.findOne({ email: req.body.email });
+      const doesExist = await UserModel.findOne({ email: email });
 
       if (doesExist) {
-        throw createError.Conflict(
-          `${req.body.email} already been registered!!!`
-        );
+        throw createError.Conflict(`${email} already been registered!!!`);
       }
 
-      if (req.body.membershipId) {
-        req.body.membershipStartDate = Date.now();
-        req.body.membershipEndDate =
-          req.body.membershipStartDate +
-          1000 * 60 * 60 * 24 * req.body.membershipDays;
+      if (membershipId) {
+        result.membershipStartDate = Date.now();
+        result.membershipEndDate =
+          result.membershipStartDate +
+          1000 * 60 * 60 * 24 * result.membershipDays;
       }
 
-      const user = new UserModel(req.body);
+      const user = new UserModel(result);
       const savedUser = await user.save();
-      const accessToken = await signAccessToken(savedUser.id);
-      const refreshToken = await signRefreshToken(savedUser.id);
+
+      const html = await ejs.renderFile(
+        templatesDir + "/registration/registration.ejs",
+        { user: savedUser.firstName.toUpperCase() }
+      );
 
       // Send mail to the user on registration
-      transporter
-        .sendMail({
-          to: req.body.email,
-          from: "ravipathekar99@gmail.com",
-          subject: "registration success",
-          html: "<p>Welcome to Urban Refresh.</p>",
-        })
-        .then(() => console.log("email sent!!!"));
+      sendMail(savedUser.email, "Registration Successful", html);
 
-      res.sendResponse({ savedUser, accessToken, refreshToken });
+      // Send text message to the user on registration
+      // const body =
+      //   "You have successfully registered on UrbanRefresh. Enjoy our services.";
+      // const to_msg = savedUser.contactNumber;
+      // sendMessage(body, to_msg);
+
+      res.sendResponse(savedUser);
     } catch (error) {
       if (error.isJoi === true) error.status = 422;
       next(error);
@@ -64,7 +60,8 @@ class User {
 
   static async login(req, res, next) {
     try {
-      const { email, password } = req.body;
+      const result = await loginValidate.validateAsync(req.body);
+      const { email, password } = result;
 
       const user = await UserModel.findOne({ email: email });
 
@@ -79,11 +76,12 @@ class User {
 
       res.send({ accessToken, refreshToken });
     } catch (error) {
+      if (error.isJoi === true) error.status = 422;
       next(createError.BadRequest("Invalid Username or Password!!!"));
     }
   }
 
-  static async refreshToken(req, res, next) {
+  static async refreshJwtTokens(req, res, next) {
     try {
       const { refreshToken } = req.body;
       if (!refreshToken) throw createError.BadRequest();
@@ -91,58 +89,48 @@ class User {
       const userId = await verifyRefreshToken(refreshToken);
 
       const accessToken = await signAccessToken(userId);
-      const refToken = await signRefreshToken(userId);
-      res.send({ accessToken, refToken });
+      const refreshToken = await signRefreshToken(userId);
+      res.send({ accessToken, refreshToken });
     } catch (error) {
       next(error);
     }
   }
 
-  static async logout(req, res, next) {
-    try {
-      const { refreshToken } = req.body;
-      if (!refreshToken) throw createError.BadRequest();
-      // const userId = await verifyRefreshToken(refreshToken);
-      const message = "User Successfully Logged Out!!!";
-      res.sendResponse(message, 204, true);
-    } catch (error) {
-      next(error);
-    }
-  }
   static async resetPassword(req, res, next) {
     try {
-      const { email, refreshToken } = req.body;
+      const { email } = req.body;
 
-      if (!refreshToken) throw createError.BadRequest();
-
-      crypto.randomBytes(32, (err, bufffer) => {
+      crypto.randomBytes(32, async (err, bufffer) => {
         if (err) {
-          console.log(err);
+          next(err);
         }
+
         const cryptToken = bufffer.toString("hex");
-        UserModel.findOne({ email: email }).then((user) => {
-          if (!user) {
-            // throw createError.BadRequest();
-            return res.status(422);
-          }
-          user.passwordResetCode = cryptToken;
-          user.resetExpiryDate = Date.now() + 360000;
-          user.save().then((result) => {
-            transporter.sendMail({
-              to: result.email,
-              from: "ravipathekar99@gmail.com",
-              subject: "Password Reset",
-              html: `
-              <p>You requested for password request</p>
-              <h5>Click on this <a href='http://localhost:5050/user/updatePassword/${cryptToken}'>link</a> to reset password</h5>`,
-            });
-          });
+        const user = await UserModel.findOne({ email: email });
+        if (!user) {
+          throw createError.BadRequest();
+        }
+
+        user.passwordResetCode = cryptToken;
+        user.resetExpiryDate = Date.now() + 360000;
+
+        let obj = {
+          userName: user.firstName.toUpperCase(),
+          token: `http://localhost:5050/user/updatePassword/${cryptToken}`,
+        };
+
+        const html = await ejs.renderFile(
+          templatesDir + "/reset-password/reset-password.ejs",
+          { obj: obj }
+        );
+
+        user.save().then(async (result) => {
+          await sendMail(user.email, "Password Reset", html);
         });
       });
 
-      // const userId = await verifyRefreshToken(refreshToken);
       let message = "Password link has been sent to your email.";
-      res.sendResponse(message, 200, true);
+      res.sendResponse(message);
     } catch (error) {
       next(error);
     }
@@ -155,33 +143,25 @@ class User {
         throw createError.NotAcceptable(
           "Password length should be greater than 6 characters"
         );
-      UserModel.findOne({
+      const user = await UserModel.findOne({
         passwordResetCode: cryptToken,
         resetExpiryDate: { $gt: Date.now() },
-      })
-        .then((user) => {
-          if (!user) {
-            return res.status(422);
-          }
-          user.password = password;
-          user.passwordResetCode = "";
-          user.resetExpiryDate = null;
-          user.save().then((savedUser) => {
-            res.sendResponse("Password Changed!!!");
-          });
-        })
-        .catch((err) => next(err));
+      });
+
+      if (!user) {
+        return createError.BadRequest();
+      }
+      user.password = password;
+      user.passwordResetCode = "";
+      user.resetExpiryDate = null;
+      user.save().then((savedUser) => {
+        const message = "Password Changed!!!";
+        res.sendResponse(message);
+      });
     } catch (error) {
       next(error);
     }
   }
-
-  // static async endDate(req, res, next) {
-  //   let startDate = Date.now();
-  //   const endDate = startDate + 1000 * 60 * 60 * 24 * 28;
-
-  //   res.sendResponse({});
-  // }
 
   static async updateProfile(req, res, next) {
     try {
