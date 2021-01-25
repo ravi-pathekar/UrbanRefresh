@@ -1,6 +1,6 @@
 const createError = require("http-errors");
 const CartModel = require("../cart/cart.model");
-const { cartCheck } = require("../../shared/validationSchema");
+const { cartValidate } = require("../../shared/validationSchema");
 const UserModel = require("../user/user.model");
 const CouponModel = require("../coupon/coupon.model");
 
@@ -8,7 +8,7 @@ class Cart {
   static async addToCart(req, res, next) {
     try {
       const userId = req.payload.aud;
-      let result = await cartCheck.validateAsync(req.body);
+      let result = await cartValidate.validateAsync(req.body);
       result.userId = userId;
       const doesExist = await CartModel.findOne({
         userId: userId,
@@ -206,8 +206,3 @@ class Cart {
 }
 
 module.exports = Cart;
-
-// isvariant check in price
-// clear cartjb kisi nayo serviceCategory se dusri me jaye
-// Use aggregation
-// remove 2 phase commit
