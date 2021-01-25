@@ -1,7 +1,7 @@
 const Joi = require("joi");
 Joi.objectId = require("joi-objectid")(Joi);
 
-const authSchema = Joi.object({
+const registerValidate = Joi.object({
   firstName: Joi.string().lowercase().trim().required(),
   lastName: Joi.string().lowercase().trim().required(),
   contactNumber: Joi.string().lowercase().min(10).max(10).required(),
@@ -22,11 +22,9 @@ const authSchema = Joi.object({
   }).required(),
   membershipId: Joi.objectId(),
   membershipDays: Joi.number(),
-  startDate: Joi.date(),
-  endDate: Joi.date(),
 });
 
-const cartCheck = Joi.object({
+const cartValidate = Joi.object({
   serviceCategoryId: Joi.objectId().required(),
   cartItems: Joi.array()
     .items(
@@ -41,7 +39,13 @@ const cartCheck = Joi.object({
   couponApplied: Joi.objectId(),
 });
 
+const loginValidate = Joi.object({
+  email: Joi.string().email().lowercase().trim().required(),
+  password: Joi.string().min(6).trim().required(),
+})
+
 module.exports = {
-  authSchema,
-  cartCheck,
+  registerValidate,
+  cartValidate,
+  loginValidate
 };
