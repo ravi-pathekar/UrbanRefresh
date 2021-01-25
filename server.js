@@ -4,23 +4,22 @@ const createError = require("http-errors");
 require("dotenv").config();
 const Mongo = require("./src/shared/mongo");
 const HandleRequest = require("./src/shared/handleRequest");
-const { verifyAccessToken } = require("./src/shared/Tokens");
+const { verifyAccessToken } = require("./src/shared/tokens");
 
 // Import Routes
 const UserRoute = require("./src/modules/user/user.controller");
-const ServiceRoute = require("./src/modules/services/service.controller");
+const ServiceRoute = require("./src/modules/service/service.controller");
 const ServiceCategoryRoute = require("./src/modules/serviceCategory/serviceCategory.controller");
 const ServiceSubCategoryRoute = require("./src/modules/serviceSubCategory/serviceSubCategory.controller");
 const ServiceProviderRoute = require("./src/modules/serviceProvider/serviceProvider.controller");
-const CityRoute = require("./src/modules/cities/cities.controller");
+const CityRoute = require("./src/modules/city/city.controller");
 const CartRoute = require("./src/modules/cart/cart.controller");
-const OrderRoute = require("./src/modules/orders/order.controller");
-const MembershipRoute = require("./src/modules/memberships/membership.controller");
+const OrderRoute = require("./src/modules/order/order.controller");
+const MembershipRoute = require("./src/modules/membership/membership.controller");
 const CouponRoute = require("./src/modules/coupon/coupon.controller");
 const HomeRoute = require("./src/modules/home/home.controller");
 const ReviewRoute = require("./src/modules/review/review.controller");
 const FaqRoute = require("./src/modules/faq/faq.controller");
-const OrderTestRoute = require("./src/modules/orderTest/orderTest.controller");
 
 // Database Connection
 new Mongo();
@@ -41,9 +40,6 @@ app.use((req, res, next) => {
   next();
 });
 
-global.EXCEPTIONS = require("./src/shared/exceptions.json");
-global.Exception = require("./src/shared/exception");
-
 // Routes
 app.use("/user", UserRoute);
 app.use("/service", ServiceRoute);
@@ -57,7 +53,6 @@ app.use("/membership", MembershipRoute);
 app.use("/coupon", CouponRoute);
 app.use("/review", ReviewRoute);
 app.use("/faq", FaqRoute);
-app.use("/orderTest", OrderTestRoute);
 
 app.use("/home", HomeRoute);
 
