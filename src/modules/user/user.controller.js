@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const { verifyAccessToken } = require("../../shared/Tokens");
+const { verifyAccessToken } = require("../../shared/tokens");
 const User = require("./user");
 
 // Register handle
@@ -10,10 +10,7 @@ router.post("/v1/register", User.register);
 router.post("/v1/login", User.login);
 
 // Refresh-token handle
-router.post("/v1/refresh-token", User.refreshToken);
-
-// Logout handle
-router.delete("/v1/logout", verifyAccessToken, User.logout);
+router.post("/v1/refreshJwtTokens", User.refreshJwtTokens);
 
 // Reset Password
 router.post("/v1/resetPassword", User.resetPassword);
