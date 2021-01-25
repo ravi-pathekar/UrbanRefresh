@@ -30,10 +30,22 @@ const ServiceProviderSchema = new mongoose.Schema(
         required: true,
       },
     ],
-    bookedOn: [
+    servingCity: {
+      type: String,
+      lowercase: true,
+      trim: true,
+      required: true,
+    },
+    // bookedOn: [
+    //   {
+    //     type: String,
+    //     // required: true,
+    //   },
+    // ],
+    bookedFor: [
       {
-        type: String,
-        // required: true,
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "order",
       },
     ],
   },

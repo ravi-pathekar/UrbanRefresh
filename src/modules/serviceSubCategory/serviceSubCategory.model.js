@@ -13,13 +13,20 @@ const ServiceSubCategorySchema = new mongoose.Schema(
       ref: "serviceCategory",
     },
     completionTime: String,
-    image: String,
-    descriptin: String,
-    priceType: String,
-    price: [
+    image: { type: String, default: "www.image.com" },
+    description: String,
+    isPriceVariants: {
+      type: Boolean,
+      required: true,
+    },
+    priceVariants: [
       {
-        priceTypes: String,
-        prices: Number,
+        priceType: { type: String, required: true },
+        price: { type: Number, required: true },
+        isDefault: {
+          type: Boolean,
+          required: true,
+        },
       },
     ],
   },
