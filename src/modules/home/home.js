@@ -1,16 +1,36 @@
 const { response } = require("express");
-const CityModel = require("../cities/cities.model");
-const ServiceModel = require("../services/service.model");
+const mongoose = require("mongoose");
+const CityModel = require("../city/city.model");
+const ServiceModel = require("../service/service.model");
 const ServiceCategoryModel = require("../serviceCategory/serviceCategory.model");
 const ServiceProviderModel = require("../serviceProvider/serviceProvider.model");
+// const ReviewModel = require("../review/review.model");
 // const ServiceSubCategoryModel = require("../serviceSubCategory/serviceSubCategory.model");
 
 class Home {
   static async home(req, res, next) {
-    const cities = await CityModel.find()
+    let country = {};
+    const cityDetails = await CityModel.find()
       .lean()
       .select("-createdAt -updatedAt -__v");
-    res.sendResponse(cities);
+
+    cityDetails.forEach((obj) => {
+      let city = null;
+      for (let key in obj) {
+        if (key === "countryName") {
+          if (country.hasOwnProperty(obj[key])) {
+            country[obj[key]].push(city);
+          } else {
+            country[obj[key]] = [];
+            country[obj[key]].push(city);
+          }
+        }
+        if (key === "cityName") {
+          city = obj[key];
+        }
+      }
+    });
+    res.sendResponse(country);
   }
 
   static async getServices(req, res, next) {
@@ -23,30 +43,29 @@ class Home {
 
   static async getServiceCategory(req, res, next) {
     const { serviceId } = req.body;
+    const objectId = mongoose.Types.ObjectId(serviceId);
 
-    const serviceCategories = await ServiceCategoryModel.find({
-      parentServiceId: serviceId,
-    }).select("-__v -createdAt -updatedAt");
+    const serviceCategory = await ServiceCategoryModel.aggregate([
+      { $match: { parentServiceId: objectId } },
+    ]);
 
-    const reviews = {
-      serviceId: 1,
-      comment: "Isko lga dala to life Jhinga La La...",
-    };
+    const serviceProvider = await ServiceProviderModel.aggregate([
+      {
+        $match: {
+          $and: [
+            { services: { $in: [serviceId] } },
+            { "address.city": "bhopal" },
+          ],
+        },
+      },
+    ]);
 
-    const serviceProviders = await ServiceProviderModel.find({
-      services: serviceId,
-    }).select("-__v -createdAt -updatedAt");
+    // const reviews = await ReviewModel.aggregate([
+    //   { $match: { serviceProviderId: serviceProvider[0]._id } },
+    // ]);
 
-    res.sendResponse({ serviceCategories, reviews, serviceProviders });
+    res.sendResponse({ serviceCategory, serviceProvider });
   }
-
-  // static async getServiceSubCategory (req, res, next) {
-  //     const { serviceCategoryId } = req.body
-
-  //     const serviceSubCategories = await ServiceSubCategoryModel.find({serviceCategoryId: serviceCategoryId }).select('-__v -createdAt -updatedAt -priceType')
-
-  //     res.sendResponse(serviceSubCategories)
-  // }
 }
 
 module.exports = Home;
