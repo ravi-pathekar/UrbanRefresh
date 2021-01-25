@@ -1,0 +1,85 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=iso-8859-1" />
+    <meta name="format-detection" content="address=no" />
+    <title>Product Updates</title>
+
+    <style type="text/css">
+      table {
+        font-family: arial, sans-serif;
+        border-collapse: collapse;
+        width: 100%;
+        text-align: center !important;
+      }
+      td,
+      th {
+        border: 1px solid #dddddd;
+        text-align: center;
+        padding: 8px;
+      }
+      tr:nth-child(even) {
+        background-color: #dddddd;
+      }
+    </style>
+  </head>
+
+  <body>
+    <div
+      class="reset-password"
+      style="
+        border: 10px solid #000;
+        width: 740px;
+        margin-left: auto;
+        margin-right: auto;
+      "
+    >
+      <div class="block">
+        <div style="padding: 10px; font-size: 18px">
+          <p>Hello, <%= order.userDetails.username %></p>
+          <p>
+            Your UrbanRefresh service has been placed with order Number <%=
+            order.orderNumber %> and the Price has been charged &#8377; <%=
+            order.totalPrice %> Your service delivery date by <%=
+            order.deliveryDate.toISOString().substring(0, 10) %>. We will send
+            you an update on service regards
+          </p>
+
+          <table style="text-align: center">
+            <tr>
+              <th>Service Name</th>
+              <th>Quantity</th>
+              <th>Price Per Quantity</th>
+            </tr>
+
+            <% order.servicesOrdered.forEach(function(item){ %>
+            <tr>
+              <td><%= item.serviceSubCategoryName %></td>
+              <td><%= item.quantity %></td>
+              <td><%= item.pricePerItem %></td>
+            </tr>
+            <% }) %> <% if (order.membershipDiscount) { %>
+            <tr>
+              <td colspan="2" style="text-align: right">Membership Discount</td>
+              <td><strong> - </strong><%= order.membershipDiscount %></td>
+            </tr>
+            <% } %> <% if (order.couponsApplied) { %>
+            <tr>
+              <td colspan="2" style="text-align: right">Coupon Discount</td>
+              <td><strong> - </strong><%= order.couponValue %></td>
+            </tr>
+            <% } %>
+            <tr>
+              <td colspan="2" style="text-align: right">Total Price</td>
+
+              <td><%= order.totalPrice %></td>
+            </tr>
+          </table>
+
+          <p>Cheers</p>
+          <p>Team Urban Refresh</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
