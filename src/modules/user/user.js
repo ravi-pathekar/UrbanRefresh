@@ -74,7 +74,7 @@ class User {
       const accessToken = await signAccessToken(user.id);
       const refreshToken = await signRefreshToken(user.id);
 
-      res.send({ accessToken, refreshToken });
+      res.sendResponse({ accessToken, refreshToken });
     } catch (error) {
       if (error.isJoi === true) error.status = 422;
       next(createError.BadRequest("Invalid Username or Password!!!"));
@@ -83,14 +83,14 @@ class User {
 
   static async refreshJwtTokens(req, res, next) {
     try {
-      const { refreshToken } = req.body;
+      let { refreshToken } = req.body;
       if (!refreshToken) throw createError.BadRequest();
 
       const userId = await verifyRefreshToken(refreshToken);
 
       const accessToken = await signAccessToken(userId);
-      const refreshToken = await signRefreshToken(userId);
-      res.send({ accessToken, refreshToken });
+      refreshToken = await signRefreshToken(userId);
+      res.sendResponse({ accessToken, refreshToken });
     } catch (error) {
       next(error);
     }
