@@ -42,7 +42,7 @@
     >
       <div class="block" style="padding: 20px">
         <div style="padding: 20px; font-size: 18px">
-          <p>Hello, <%= order.userDetails.username %></p>
+          <p>Hello <%= order.userDetails.userName.toUpperCase() %>,</p>
           <p>
             Your UrbanRefresh service has been cancelled with order Number <%=
             order.orderNumber %> as per your request.
@@ -59,7 +59,9 @@
             <tr class="strikeout">
               <td><%= item.serviceSubCategoryName %></td>
               <td><%= item.quantity %></td>
-              <td style="text-decoration: line-through"><%= item.pricePerItem %></td>
+              <td style="text-decoration: line-through">
+                <%= item.pricePerItem %>
+              </td>
             </tr>
             <% }) %> <% if (order.membershipDiscount) { %>
             <tr class="strikeout" style="text-decoration: line-through">
@@ -79,7 +81,7 @@
             </tr>
           </table>
 
-          <p>Cheers</p>
+          <p>Cheers,</p>
           <p>Team Urban Refresh</p>
         </div>
       </div>

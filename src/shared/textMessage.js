@@ -6,11 +6,15 @@ const client = new twilio(
 
 module.exports = {
   sendMessage: async (body, to) => {
-    await client.messages.create({
-      body: body,
-      to: "+919993531964",
-      from: "+14159410491",
-    });
-    console.log(message.sid);
+    try {
+      await client.messages.create({
+        body: body,
+        to: "+919993531964",
+        from: "+14159410491",
+      });
+      console.log(message.sid);
+    } catch (error) {
+      console.log(error);
+    }
   },
 };
