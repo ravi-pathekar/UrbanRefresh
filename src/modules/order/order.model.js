@@ -10,6 +10,7 @@ const OrderSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       required: true,
+      enum: [0, 1, 2, 3, 4, 5],
     },
     orderNote: {
       type: String,
@@ -86,7 +87,7 @@ const OrderSchema = new mongoose.Schema(
       ref: "coupon",
     },
     deliveryDate: {
-      type: String,
+      type: Date,
       required: true,
     },
     deliveryTime: {

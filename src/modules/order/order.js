@@ -1,5 +1,4 @@
 const createError = require("http-errors");
-const mongoose = require("mongoose");
 const UserModel = require("./../user/user.model");
 const OrderModel = require("./order.model");
 const ServiceSubCategoryModel = require("./../serviceSubCategory/serviceSubCategory.model");
@@ -8,25 +7,8 @@ const MembershipModel = require("./../membership/membership.model");
 const CouponModel = require("./../coupon/coupon.model");
 const templatesDir = `${__dirname}/../../../templates`;
 const ejs = require("ejs");
-
-const Nexmo = require("nexmo");
-
-const nodeMailer = require("nodemailer");
-const sendgridTransport = require("nodemailer-sendgrid-transport");
-
-const transporter = nodeMailer.createTransport(
-  sendgridTransport({
-    auth: {
-      api_key:
-        "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",
-    },
-  })
-);
-
-const nexmo = new Nexmo({
-  apiKey: "3fedf60f",
-  apiSecret: "TNgboaoKnEV7ootk",
-});
+const { sendMail } = require("../../shared/mailer");
+const { sendMessage } = require("../../shared/textMessage");
 
 class Order {
   static async addOrder(req, res, next) {
@@ -36,24 +18,24 @@ class Order {
         deliveryDate,
         deliveryTime,
         orderNote,
-        couponId,
+        couponsApplied,
         isDefaultAddress,
         customAddress,
       } = req.body;
+      const userId = req.payload.aud;
 
       if (servicesOrdered.length > 5) {
         throw createError.NotAcceptable("Only 5 Items accepted in one order");
       }
 
-      const userId = req.payload.aud;
+      await Order.__checkDeliveryMonth(deliveryDate);
 
       let orderData = {};
-      let alertObj = {};
       const orderedServices = [];
       let subTotal = 0;
 
       const deliveryUnixDate = new Date(deliveryDate).getTime() / 1000;
-      const currentDate = await Order.getCurrentDate();
+      const currentDate = await Order.__getCurrentDate();
       if (currentDate > deliveryUnixDate) {
         throw createError.NotAcceptable(
           "Delivery date should be greater than current date."
@@ -70,18 +52,18 @@ class Order {
         _id: servicesOrdered[0].serviceSubCategoryId,
       }).populate({
         path: "serviceCategoryId",
-        populate: { path: "parentServiceId" },
       });
+      if (!serviceDetail) {
+        throw createError.NotFound("No Profucts Found!!!");
+      }
       orderData.serviceCategoryId = serviceDetail.serviceCategoryId._id;
-      orderData.serviceId = serviceDetail.serviceCategoryId.parentServiceId._id;
+      orderData.serviceId = serviceDetail.serviceCategoryId.parentServiceId;
 
-      let serviceProviderDetails = await Order.getServiceProvider(
+      let serviceProviderDetails = await Order.__getServiceProvider(
         orderData.serviceId,
         userDetails.deliveryAddress.city,
         deliveryUnixDate
       );
-
-      await Order.checkDeliveryMonth(deliveryDate);
 
       for (let i = 0; i < servicesOrdered.length; i++) {
         const {
@@ -91,9 +73,9 @@ class Order {
           isVariantPrice,
           pricePerItem,
         } = servicesOrdered[i];
-
         let servicesOrderedObj = {};
-        const serviceSubCategoryDetails = await Order.getServiceSubCategoryDetails(
+
+        const serviceSubCategoryDetails = await Order.__getServiceSubCategoryDetails(
           serviceSubCategoryId
         );
         const {
@@ -116,19 +98,25 @@ class Order {
         orderedServices.push(servicesOrderedObj);
       }
 
-      if (userDetails.userMembershipEndDate) {
-        if (currentDate <= userDetails.userMembershipEndDate) {
-          const membershipDiscount = await Order.checkUserMembership(
-            userDetails.userMembershipId
-          );
-          delete userDetails.userMembershipEndDate;
-          if (membershipDiscount) {
-            orderData.membershipDiscount = membershipDiscount;
-            subTotal = subTotal - membershipDiscount;
-          }
-        } else {
-          alertObj.membershipExpired = "Your membership has expired";
-        }
+      orderData.membershipDiscount = 0;
+      if (userDetails.userMembershipId) {
+        const membershipDiscount = await Order.__checkUserMembership(
+          userDetails.userMembershipId
+        );
+        orderData.membershipDiscount = membershipDiscount;
+        subTotal = subTotal - membershipDiscount;
+      }
+
+      orderData.couponValue = 0;
+      orderData.couponsApplied = "";
+      if (couponsApplied) {
+        const couponDiscount = await Order.__checkCoupon(
+          couponsApplied,
+          orderData.serviceCategoryId
+        );
+        orderData.couponValue = couponDiscount;
+        subTotal = subTotal - couponDiscount;
+        orderData.couponsApplied = couponsApplied;
       }
 
       const getOrders = await OrderModel.findOne()
@@ -141,33 +129,22 @@ class Order {
       orderData.orderNote = orderNote;
       orderData.serviceProviderDetails = serviceProviderDetails;
       orderData.servicesOrdered = orderedServices;
-      orderData.deliveryDate = deliveryUnixDate;
+      orderData.deliveryDate = deliveryDate;
       orderData.deliveryTime = deliveryTime;
-
-      if (couponId) {
-        const couponDiscount = await Order.checkCoupon(couponId);
-        if (couponDiscount) {
-          orderData.couponValue = couponDiscount;
-          subTotal = subTotal - couponDiscount;
-          orderData.couponsApplied = couponId;
-        }
-      }
       orderData.totalPrice = subTotal;
-      console.log("Output---------------------------> ~ file: order.js ~ line 156 ~ Order ~ addOrder ~ orderData", orderData)
-      await Order.convertUnixToRealTime(deliveryUnixDate);
 
-      // const createOrder = await new OrderModel(orderData).save();
-      // if (!createOrder) {
-      //   throw createError.InternalServerError();
-      // }
-      // await Order.setBookingDateInServiceProvider(
-      //   createOrder._id,
-      //   serviceProviderDetails.serviceProviderId
-      // );
-      // await Order.orderNotification_Mail(createOrder);
-      // await Order.orderNotification_Message(createOrder);
-      // res.sendResponse({ createOrder, alertObj });
-      res.sendResponse({});
+      const addOrder = await new OrderModel(orderData).save();
+      if (!addOrder) {
+        throw createError.InternalServerError();
+      }
+      await Order.__updateServiceProvider(
+        addOrder._id,
+        deliveryUnixDate,
+        serviceProviderDetails.serviceProviderId
+      );
+      await Order.__sendOrderMail(addOrder);
+      // await Order.__sendOrderMessage(addOrder);
+      res.sendResponse(addOrder);
     } catch (err) {
       next(err);
     }
@@ -192,24 +169,14 @@ class Order {
     userDetails.deliveryAddress = isDefaultAddress
       ? user.address
       : customAddress;
-
-    if (user.membershipId) {
-      userDetails.userMembershipId = user.membershipId;
-      const utc = user.membershipEndDate
-        .toJSON()
-        .slice(0, 10)
-        .replace(/-/g, "/");
-      const endDateUnix = new Date(utc).getTime() / 1000;
-      userDetails.userMembershipEndDate = endDateUnix;
-    }
+    userDetails.userMembershipId = user.isActive ? user.membershipId : null;
     return userDetails;
   }
 
-  static async getServiceSubCategoryDetails(serviceSubCategoryId) {
+  static async __getServiceSubCategoryDetails(serviceSubCategoryId) {
     const serviceSubCategoryDetails = await ServiceSubCategoryModel.findOne({
       _id: serviceSubCategoryId,
     });
-
     if (!serviceSubCategoryDetails) {
       throw createError.NotFound("No Profucts Found!!!");
     }
@@ -217,50 +184,36 @@ class Order {
     return serviceSubCategoryDetails;
   }
 
-  static async getServiceProvider(serviceId, serviceCity, deliveryDate) {
+  static async __getServiceProvider(serviceId, serviceCity, deliveryUnixDate) {
     let serviceProvider = {};
-    // const getproviders = await ServiceProviderModel.find({
-    //   $and: [
-    //     {
-    //       services: { $in: [serviceId] },
-    //       // servingCity: serviceCity,
-    //       // bookedFor: { $exists: true, $nin: [deliveryDate] },
-    //     },
-    //   ],
-    // });
-    const serviceID = mongoose.Types.ObjectId(serviceId);
-    // console.log(
-    //   "Output---------------------------> ~ file: order.js ~ line 231 ~ Order ~ getServiceProvider ~ serviceID",
-    //   serviceID
-    // );
-
+    const serviceID = serviceId.toString();
+    const deliveryDate = deliveryUnixDate.toString();
     const getproviders = await ServiceProviderModel.aggregate([
       {
         $match: {
           $and: [
-            // { services: { $in: [serviceID] } },
-            { "address.city": "bhopal" },
+            { services: { $in: [serviceID] } },
+            { servingCity: serviceCity },
+            { "bookedFor.deliveryDate": { $nin: [deliveryDate] } },
           ],
         },
       },
+      {
+        $project: {
+          serviceProviderName: 1,
+          contactNumber: 1,
+          bookedFor: { $size: "$bookedFor" },
+        },
+      },
+      { $sort: { bookedFor: 1 } },
+      { $limit: 1 },
     ]);
-    // console.log(
-    //   "Output---------------------------> ~ file: order.js ~ line 233 ~ Order ~ getServiceProvider ~ getproviders",
-    //   getproviders
-    // );
-
     if (!getproviders.length) {
       throw createError.Conflict(
         `All Service Provider are busy in this region on ${deliveryDate} `
       );
     }
-
-    getproviders.sort(function (a, b) {
-      return a.bookedFor.length - b.bookedFor.length;
-    });
-
     const { _id, serviceProviderName, contactNumber } = getproviders[0];
-
     serviceProvider.serviceProviderId = _id;
     serviceProvider.providerName = serviceProviderName;
     serviceProvider.contactNumber = contactNumber;
@@ -268,82 +221,129 @@ class Order {
     return serviceProvider;
   }
 
-  static async setBookingDateInServiceProvider(orderId, providerId) {
-    if (!orderId) {
-      throw new Exception("ValidationError", "Delivery Date not found");
-    }
-    const addDate = await ServiceProviderModel.updateOne(
+  static async __updateServiceProvider(orderId, deliveryDate, providerId) {
+    const updatedProvider = await ServiceProviderModel.findOneAndUpdate(
       { _id: providerId },
-      { $addToSet: { bookedFor: orderId } }
+      {
+        $push: {
+          bookedFor: {
+            orderId: orderId,
+            deliveryDate: deliveryDate,
+          },
+        },
+      }
     );
-
-    return addDate;
-  }
-
-  static async checkUserMembership(membershipId) {
-    const membership = await MembershipModel.findOne({
-      _id: membershipId,
-    }).lean();
-    if (!membership) {
-      console.log("User has not taken any Memebership ");
+    if (!updatedProvider) {
+      throw createError.InternalServerError();
     }
-    return membership.membershipDiscount;
+    return updatedProvider;
   }
 
-  static async getCustomerOrder(req, res, next) {
+  static async __checkUserMembership(membershipId) {
+    try {
+      const membership = await MembershipModel.findOne({
+        _id: membershipId,
+      }).lean();
+      if (!membership) {
+        console.log("This membership doesn't exist!!!");
+      }
+      let membershipDiscount =
+        membership && membership.membershipDiscount
+          ? membership.membershipDiscount
+          : 0;
+      return membershipDiscount;
+    } catch (error) {
+      console.log(error);
+    }
+  }
+
+  static async __getCurrentDate() {
+    const utc = new Date().toJSON().slice(0, 10).replace(/-/g, "/");
+    const currentUnixDate = new Date(utc).getTime() / 1000;
+    return currentUnixDate;
+  }
+
+  static async __checkCoupon(couponId, serviceCategoryId) {
+    const couponDetails = await CouponModel.findOne({
+      _id: couponId,
+      isActive: true,
+      serviceCategoryId: serviceCategoryId,
+    });
+
+    let couponValue =
+      couponDetails && couponDetails.couponValue
+        ? couponDetails.couponValue
+        : 0;
+
+    return couponValue;
+  }
+
+  static async __checkDeliveryMonth(deliveryDate) {
+    const currentDate = await Order.__getCurrentDate();
+    const inUnixTime = new Date(deliveryDate).getTime() / 1000;
+    const dateAfter30Days = currentDate + 60 * 60 * 24 * 30;
+
+    if (currentDate < inUnixTime && dateAfter30Days < inUnixTime) {
+      throw createError.NotAcceptable(
+        "We don't accept order for more than 30 days!!!"
+      );
+    }
+  }
+
+  // static async convertUnixToRealTime(unixDate) {
+  //   const inUnixTime = new Date(unixDate * 1000);
+  // }
+
+  static async getOrder(req, res, next) {
     try {
       const userId = req.payload.aud;
-
-      const userDetails = await Order.__addUserDetails(userId);
-
       const orders = await OrderModel.find({
-        "userDetails.userId": userDetails.userId,
+        "userDetails.userId": userId,
       })
         .lean()
         .sort({ orderNumber: -1 });
 
-      if (!orders.length) {
-        res.sendResponse("No items in the cart");
-      }
-
       !orders.length
-        ? res.sendResponse("No items in the cart")
+        ? res.sendResponse("No Orders!!!", 404)
         : res.sendResponse(orders);
-    } catch (err) {
-      next(err);
+    } catch (error) {
+      next(error);
     }
   }
 
   static async updateOrderStatus(req, res, next) {
     try {
-      // get Customer Id as a token
       const userId = req.payload.aud;
       const { Status } = req.body;
       const { orderId } = req.params;
+      const statusCode = [0, 1, 2, 3];
 
       if (Status === 5) {
-        const orders = await OrderModel.findOne({
-          $and: [{ _id: orderId }, { "userDetails.userId": userId }],
+        const orderDetail = await OrderModel.findOne({
+          $and: [
+            { _id: orderId },
+            { "userDetails.userId": userId },
+            { orderStatus: { $in: statusCode } },
+          ],
         }).lean();
 
-        if (!orders) {
-          console.log("Customer has no order with this id..");
-        }
-        if (orders.orderStatus === 5) {
-          throw new Exception("OrderError", "Order already cancelled");
+        if (!orderDetail) {
+          throw createError.BadRequest(
+            "This order not found or already been cancelled!!!"
+          );
         }
 
-        await Order.cancelOrder(orders);
-        await Order.orderNotification_CancelMail(orders);
+        await Order.__cancelOrder(orderDetail);
+        await Order.__sendCancelOrderMail(orderDetail);
       }
 
-      const updateOrderStatus = await OrderModel.updateOne(
+      const updatedOrderStatus = await OrderModel.findOneAndUpdate(
         { $and: [{ _id: orderId }, { "userDetails.userId": userId }] },
-        { $set: { orderStatus: Status } }
+        { $set: { orderStatus: Status } },
+        { new: true }
       );
-
-      if (!updateOrderStatus) {
-        throw new global.Exception("GeneralError");
+      if (!updatedOrderStatus) {
+        throw createError.InternalServerError();
       }
       res.sendResponse("Status updated Successfully");
     } catch (err) {
@@ -351,97 +351,73 @@ class Order {
     }
   }
 
-  static async getCurrentDate() {
-    const utc = new Date().toJSON().slice(0, 10).replace(/-/g, "/");
-    const currentUnixtime = new Date(utc).getTime() / 1000;
-    return currentUnixtime;
-  }
+  static async __cancelOrder(orders) {
+    try {
+      let {
+        _id: orderId,
+        deliveryDate,
+        serviceProviderDetails: { serviceProviderId } = {
+          serviceProviderId: null,
+        },
+      } = orders;
 
-  static async checkCoupon(couponId) {
-    const getCoupon = await CouponModel.findOne({ _id: couponId });
+      const utc = new Date(deliveryDate)
+        .toJSON()
+        .slice(0, 10)
+        .replace(/-/g, "-");
+      deliveryDate = new Date(utc).getTime() / 1000;
 
-    if (Date.now() > Date.parse(getCoupon.endTime)) {
-      throw new Exception("CouponExpire");
-    }
-    return getCoupon.couponValue;
-  }
-
-  static async checkDeliveryMonth(deliveryDate) {
-    const currentDate = await Order.getCurrentDate();
-    const inUnixTime = new Date(deliveryDate).getTime() / 1000;
-    const dateAfter60Days = currentDate + 60 * 60 * 24 * 30;
-
-    if (currentDate < inUnixTime && dateAfter60Days < inUnixTime) {
-      throw createError.NotAcceptable(
-        "We doesn't accept order for more than 30 days!!!"
+      const updatedProviderDetails = await ServiceProviderModel.findOneAndUpdate(
+        {
+          $and: [
+            { _id: serviceProviderId },
+            {
+              "bookedFor.deliveryDate": { $exists: true, $in: [deliveryDate] },
+            },
+          ],
+        },
+        { $pull: { bookedFor: { orderId: orderId } } },
+        { new: true }
       );
+    } catch (error) {
+      console.log(error);
     }
   }
 
-  static async convertUnixToRealTime(unixDate) {
-    const inUnixTime = new Date(unixDate * 1000);
+  static async __sendOrderMessage(order) {
+    let {
+      orderNumber,
+      deliveryDate,
+      deliveryTime,
+      serviceProviderDetails,
+      userDetails,
+    } = order;
+    deliveryDate = deliveryDate.toString().substring(0, 10);
+
+    const body = `Your order with Order No. ${orderNumber} has been placed on ${deliveryDate}.
+    ${serviceProviderDetails.providerName} will be at your door at ${deliveryTime}. 
+    Team Urban Refresh.`;
+    const to_msg = userDetails.contactNumber;
+
+    sendMessage(body, to_msg);
   }
 
-  static async cancelOrder(orders) {
-    const serviceProviderId = orders.serviceProviderDetails.serviceProviderId;
-
-    const utc = new Date(orders.deliveryDate)
-      .toJSON()
-      .slice(0, 10)
-      .replace(/-/g, "-");
-    const deliveryDate = new Date(utc).getTime() / 1000;
-
-    const provider = await ServiceProviderModel.findOneAndUpdate(
-      {
-        $and: [
-          { _id: serviceProviderId },
-          { bookedon: { $exists: true, $in: [deliveryDate] } },
-        ],
-      },
-      { $pull: { bookedon: { $in: [deliveryDate] } } }
-    );
-  }
-
-  static async orderNotification_Message(order) {
-    // const deliveryDate = order.deliveryDate.toISOString().substring(0, 10);
-    // const from = "Vonage APIs";
-    // const to = "917905689433";
-    // const text = `Hello ${order.userDetails.username}
-    //               Service Placed : Your UrbanRefresh service has been placed with order Number ${order.orderNumber} and the  Price has been charged :${order.totalPrice} Your service delivery date by ${deliveryDate}. We will send you an update on service regards`;
-    // nexmo.message.sendSms(from, to, text);
-  }
-
-  static async orderNotification_Mail(order) {
-    const emailTemplate = await ejs.renderFile(
-      templatesDir + "/order/place-order.ejs",
-      { order: order }
-    );
-
-    transporter.sendMail({
-      to: "ravipathekar88@gmail.com",
-      from: "ravipathekar99@gmail.com",
-      subject: "Order Has Been Placeed Succesfully",
-      html: emailTemplate,
+  static async __sendOrderMail(order) {
+    const html = await ejs.renderFile(templatesDir + "/order/place-order.ejs", {
+      order: order,
     });
+
+    sendMail(order.userDetails.userEmail, "Order Placed", html);
   }
-  static async orderNotification_CancelMail(order) {
-    const cancelTemplate = await ejs.renderFile(
+
+  static async __sendCancelOrderMail(order) {
+    const html = await ejs.renderFile(
       templatesDir + "/order/cancel-order.ejs",
       { order: order }
     );
 
-    transporter.sendMail({
-      to: "ravipathekar88@gmail.com",
-      from: "ravipathekar99@gmail.com",
-      subject: "Order Has Been Cancelled Succesfully",
-      html: cancelTemplate,
-    });
-
-    // const from = "Vonage APIs";
-    // const to = "917905689433";
-    // const text = `Hello ${order.userDetails.username}, \nService Cancelled :Your UrbanRefresh service has been cancelled with order Number ${order.orderNumber} as per your request.
-    //               `;
-    // nexmo.message.sendSms(from, to, text);
+    sendMail(order.userDetails.userEmail, "Order Cancelled", html);
   }
 }
+
 module.exports = Order;
