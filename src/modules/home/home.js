@@ -54,7 +54,7 @@ class Home {
         $match: {
           $and: [
             { services: { $in: [serviceId] } },
-            { "address.city": "bhopal" },
+            { servingCity: "bhopal" },
           ],
         },
       },
