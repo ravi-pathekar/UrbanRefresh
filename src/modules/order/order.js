@@ -18,7 +18,7 @@ class Order {
         deliveryDate,
         deliveryTime,
         orderNote,
-        couponsApplied,
+        couponApplied,
         isDefaultAddress,
         customAddress,
       } = req.body;
@@ -108,15 +108,15 @@ class Order {
       }
 
       orderData.couponValue = 0;
-      orderData.couponsApplied = "";
-      if (couponsApplied) {
+      orderData.couponApplied = null;
+      if (couponApplied) {
         const couponDiscount = await Order.__checkCoupon(
-          couponsApplied,
+          couponApplied,
           orderData.serviceCategoryId
         );
         orderData.couponValue = couponDiscount;
         subTotal = subTotal - couponDiscount;
-        orderData.couponsApplied = couponsApplied;
+        orderData.couponApplied = couponApplied;
       }
 
       const getOrders = await OrderModel.findOne()

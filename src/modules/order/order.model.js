@@ -82,7 +82,7 @@ const OrderSchema = new mongoose.Schema(
       },
     },
     totalPrice: { type: Number },
-    couponsApplied: {
+    couponApplied: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "coupon",
     },
