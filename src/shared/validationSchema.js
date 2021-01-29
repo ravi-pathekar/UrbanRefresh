@@ -42,10 +42,10 @@ const cartValidate = Joi.object({
 const loginValidate = Joi.object({
   email: Joi.string().email().lowercase().trim().required(),
   password: Joi.string().min(6).trim().required(),
-})
+});
 
 module.exports = {
   registerValidate,
   cartValidate,
-  loginValidate
+  loginValidate,
 };
