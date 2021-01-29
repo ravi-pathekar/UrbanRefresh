@@ -1,6 +1,7 @@
 const { urlencoded } = require("express");
 const express = require("express");
 const createError = require("http-errors");
+const helmet = require("helmet");
 require("dotenv").config();
 const Mongo = require("./src/shared/mongo");
 const HandleRequest = require("./src/shared/handleRequest");
@@ -28,6 +29,7 @@ new Mongo();
 const app = express();
 app.use(express.json());
 app.use(urlencoded({ extended: true }));
+app.use(helmet());
 
 //
 app.get("/", (req, res, next) => {
