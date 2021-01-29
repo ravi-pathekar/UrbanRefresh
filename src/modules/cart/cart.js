@@ -9,7 +9,16 @@ class Cart {
     try {
       const userId = req.payload.aud;
       let result = await cartValidate.validateAsync(req.body);
+      console.log(
+        "Output---------------------------> ~ file: cart.js ~ line 12 ~ Cart ~ addToCart ~ result",
+        result
+      );
       result.userId = userId;
+      result.couponApplied = result.couponApplied ? result.couponApplied : null;
+      console.log(
+        "Output---------------------------> ~ file: cart.js ~ line 18 ~ Cart ~ addToCart ~ result.couponApplied",
+        result.couponApplied
+      );
       const doesExist = await CartModel.findOne({
         userId: userId,
       }).lean();
@@ -39,6 +48,7 @@ class Cart {
               {
                 $set: {
                   "cartItems.$.quantity": result.cartItems[0].quantity,
+                  couponApplied: result.couponApplied,
                 },
               },
               { new: true }
@@ -67,6 +77,7 @@ class Cart {
                   pricePerItem: result.cartItems[0].pricePerItem,
                 },
               },
+              $set: { couponApplied: result.couponApplied },
             },
             { new: true }
           );
@@ -83,6 +94,7 @@ class Cart {
             $set: {
               serviceCategoryId: result.serviceCategoryId,
               cartItems: result.cartItems,
+              couponApplied: result.couponApplied,
             },
           },
           { new: true }
@@ -121,12 +133,14 @@ class Cart {
         ? userDiscount.membershipId.membershipDiscount
         : 0;
 
-    const coupon = await CouponModel.findOne({
-      _id: result.couponApplied,
-      isActive: true,
-    }).select("couponValue");
-
-    const couponValue = coupon["couponValue"];
+    let couponValue = 0;
+    if (result.couponApplied) {
+      const coupon = await CouponModel.findOne({
+        _id: result.couponApplied,
+        isActive: true,
+      }).select("couponValue");
+      couponValue = coupon["couponValue"];
+    }
 
     totalPrice = totalPrice - (membershipDiscount + couponValue);
     return totalPrice;

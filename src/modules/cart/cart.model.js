@@ -42,7 +42,6 @@ const CartSchema = new mongoose.Schema(
     ],
     couponApplied: {
       type: mongoose.Schema.Types.ObjectId,
-      required: true,
     },
   },
   {
