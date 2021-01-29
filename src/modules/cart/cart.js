@@ -9,16 +9,8 @@ class Cart {
     try {
       const userId = req.payload.aud;
       let result = await cartValidate.validateAsync(req.body);
-      console.log(
-        "Output---------------------------> ~ file: cart.js ~ line 12 ~ Cart ~ addToCart ~ result",
-        result
-      );
       result.userId = userId;
       result.couponApplied = result.couponApplied ? result.couponApplied : null;
-      console.log(
-        "Output---------------------------> ~ file: cart.js ~ line 18 ~ Cart ~ addToCart ~ result.couponApplied",
-        result.couponApplied
-      );
       const doesExist = await CartModel.findOne({
         userId: userId,
       }).lean();
