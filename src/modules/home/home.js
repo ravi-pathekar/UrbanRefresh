@@ -1,70 +1,137 @@
-const { response } = require("express");
-const mongoose = require("mongoose");
+const createError = require("http-errors");
 const CityModel = require("../city/city.model");
 const ServiceModel = require("../service/service.model");
 const ServiceCategoryModel = require("../serviceCategory/serviceCategory.model");
 const ServiceProviderModel = require("../serviceProvider/serviceProvider.model");
-// const ReviewModel = require("../review/review.model");
-// const ServiceSubCategoryModel = require("../serviceSubCategory/serviceSubCategory.model");
+const FaqModel = require("../faq/faq.model");
 
 class Home {
   static async home(req, res, next) {
-    let country = {};
-    const cityDetails = await CityModel.find()
-      .lean()
-      .select("-createdAt -updatedAt -__v");
-
-    cityDetails.forEach((obj) => {
-      let city = null;
-      for (let key in obj) {
-        if (key === "countryName") {
-          if (country.hasOwnProperty(obj[key])) {
-            country[obj[key]].push(city);
-          } else {
-            country[obj[key]] = [];
-            country[obj[key]].push(city);
-          }
-        }
-        if (key === "cityName") {
-          city = obj[key];
-        }
-      }
-    });
-    res.sendResponse(country);
+    try {
+      let cityDetails = await CityModel.aggregate([
+        {
+          $group: { _id: "$countryName", cities: { $push: "$$ROOT" } },
+        },
+        {
+          $project: {
+            _id: 0,
+            countryName: "$_id",
+            "cities._id": 1,
+            "cities.cityName": 1,
+            "cities.currencyCode": 1,
+          },
+        },
+      ]);
+      res.sendResponse(cityDetails);
+    } catch (error) {
+      next(error);
+    }
   }
 
   static async getServices(req, res, next) {
-    const { cityId } = req.body;
-    const services = await ServiceModel.find({ cities: cityId }).select(
-      "-__v -createdAt -updatedAt"
-    );
-    res.sendResponse(services);
+    try {
+      const { city } = req.params;
+      const services = await ServiceModel.find({
+        cities: { $in: [city] },
+      }).select("-__v -createdAt -updatedAt -cities");
+      res.sendResponse(services);
+    } catch (error) {
+      next(error);
+    }
   }
 
   static async getServiceCategory(req, res, next) {
-    const { serviceId } = req.body;
-    const objectId = mongoose.Types.ObjectId(serviceId);
+    try {
+      let { city, service } = req.params;
 
-    const serviceCategory = await ServiceCategoryModel.aggregate([
-      { $match: { parentServiceId: objectId } },
-    ]);
+      const cityDetails = await CityModel.findOne({
+        _id: city,
+      })
+        .select("cityName")
+        .lean();
+      if (!cityDetails) {
+        throw createError.BadRequest();
+      }
 
-    const serviceProvider = await ServiceProviderModel.aggregate([
-      {
-        $match: {
-          $and: [
-            { services: { $in: [serviceId] } },
-            { servingCity: "bhopal" },
-          ],
+      const serviceDetails = await ServiceModel.findOne({
+        $and: [{ _id: service }, { cities: { $in: [city] } }],
+      });
+      if (!serviceDetails) {
+        throw createError.BadRequest();
+      }
+
+      const serviceCategory = await ServiceCategoryModel.find({
+        parentServiceId: service,
+      })
+        .select("serviceCategoryName")
+        .lean();
+
+      const serviceProvider = await ServiceProviderModel.aggregate([
+        {
+          $match: {
+            $and: [
+              { services: { $in: [service] } },
+              { servingCity: cityDetails["cityName"] },
+            ],
+          },
         },
-      },
-    ]);
+        {
+          $lookup: {
+            from: "reviews",
+            let: { providerId: "$_id" },
+            pipeline: [
+              {
+                $match: {
+                  $expr: {
+                    $eq: ["$serviceProviderId", "$$providerId"],
+                  },
+                },
+              },
+              {
+                $group: {
+                  _id: "$serviceProviderId",
+                  reviews: { $push: "$reviews" },
+                },
+              },
+              {
+                $project: {
+                  _id: 0,
+                  reviews: {
+                    $map: {
+                      input: "$reviews",
+                      as: "review",
+                      in: { $mergeObjects: "$$review" },
+                    },
+                  },
+                },
+              },
+            ],
+            as: "Reviews",
+          },
+        },
+        {
+          $project: {
+            servingCity: 1,
+            serviceProviderName: 1,
+            image: 1,
+            Reviews: {
+              reviews: {
+                userName: 1,
+                rating: 1,
+                comment: 1,
+              },
+            },
+          },
+        },
+      ]);
 
-    // const reviews = await ReviewModel.aggregate([
-    //   { $match: { serviceProviderId: serviceProvider[0]._id } },
-    // ]);
-
-    res.sendResponse({ serviceCategory, serviceProvider });
+      const faqs = await FaqModel.find({ serviceId: service })
+        .select("question answer -_id")
+        .lean();
+      res.sendResponse({ serviceCategory, serviceProvider, faqs });
+    } catch (error) {
+      next(error);
+    }
   }
 }
 
