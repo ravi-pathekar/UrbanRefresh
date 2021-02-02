@@ -4,6 +4,7 @@ const ServiceModel = require("../service/service.model");
 const ServiceCategoryModel = require("../serviceCategory/serviceCategory.model");
 const ServiceProviderModel = require("../serviceProvider/serviceProvider.model");
 const FaqModel = require("../faq/faq.model");
+const ServiceSubCategoryModel = require("../serviceSubCategory/serviceSubCategory.model");
 
 class Home {
   static async home(req, res, next) {
@@ -129,6 +130,47 @@ class Home {
         .select("question answer -_id")
         .lean();
       res.sendResponse({ serviceCategory, serviceProvider, faqs });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getServiceSubCategory(req, res, next) {
+    try {
+      const { city, serviceId, serviceCategoryId } = req.params;
+      const serviceDetails = await ServiceModel.findOne({
+        $and: [{ _id: serviceId }, { cities: { $in: [city] } }],
+      });
+      if (!serviceDetails) {
+        throw createError.BadRequest();
+      }
+
+      const serviceCategoryDetails = await ServiceSubCategoryModel.find({
+        serviceCategoryId: serviceCategoryId,
+      })
+        .select("-createdAt -updatedAt -__v")
+        .lean();
+      if (!serviceCategoryDetails) {
+        throw createError.BadRequest();
+      }
+      res.sendResponse(serviceCategoryDetails);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getServiceSubCategoryDetails(req, res, next) {
+    try {
+      const { serviceSubCategoryId } = req.params;
+      const serviceSubCategoryDetails = await ServiceSubCategoryModel.findOne({
+        _id: serviceSubCategoryId,
+      })
+        .select("-createdAt -updatedAt -__v")
+        .lean();
+      if (!serviceSubCategoryDetails) {
+        throw createError.BadRequest();
+      }
+      res.sendResponse(serviceSubCategoryDetails);
     } catch (error) {
       next(error);
     }
