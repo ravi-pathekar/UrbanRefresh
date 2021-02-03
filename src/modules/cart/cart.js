@@ -111,10 +111,6 @@ class Cart {
       })
         .select("-updatedAt -createdAt -__v")
         .lean();
-      console.log(
-        "Output---------------------------> ~ file: cart.js ~ line 112 ~ Cart ~ getCart ~ cartDetails",
-        cartDetails
-      );
       res.sendResponse(cartDetails);
     } catch (error) {
       next(error);
