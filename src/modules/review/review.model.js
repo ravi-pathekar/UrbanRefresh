@@ -9,20 +9,19 @@ const ReviewSchema = new mongoose.Schema(
     },
     reviews: [
       {
-        userId: {
-          type: mongoose.Schema.Types.ObjectId,
-          ref: "serviceProvider",
+        userName: {
+          type: String,
           required: true,
         },
         rating: {
           type: Number,
           max: 5,
+          required: true,
         },
         comment: {
           type: String,
           maxlength: 255,
           trim: true,
-          required: true,
         },
       },
     ],
