@@ -47,7 +47,6 @@ class Cart {
             );
           }
         }
-
         if (!updatedCart) {
           if (classCartItems.length === 5) {
             throw createError.NotAcceptable(
@@ -94,9 +93,7 @@ class Cart {
       } else {
         updatedCart = await CartModel.create(result);
       }
-
-      const totalPrice = await Cart.calculatePrice(updatedCart, userId, result);
-
+      const totalPrice = await Cart.calculatePrice(updatedCart, userId);
       res.sendResponse({ updatedCart, totalPrice });
     } catch (error) {
       if (error.isJoi === true) error.status = 422;
@@ -104,8 +101,28 @@ class Cart {
     }
   }
 
-  static async calculatePrice(updatedCart, userId, result) {
-    const { cartItems } = updatedCart;
+  static async getCart(req, res, next) {
+    try {
+      const userId = req.payload.aud;
+      const { serviceCategoryId } = req.params;
+
+      const cartDetails = await CartModel.findOne({
+        $and: [{ userId: userId }, { serviceCategoryId: serviceCategoryId }],
+      })
+        .select("-updatedAt -createdAt -__v")
+        .lean();
+      console.log(
+        "Output---------------------------> ~ file: cart.js ~ line 112 ~ Cart ~ getCart ~ cartDetails",
+        cartDetails
+      );
+      res.sendResponse(cartDetails);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async calculatePrice(cartDetails, userId) {
+    const { cartItems, couponApplied } = cartDetails;
     let totalPrice = 0;
     for (let i = 0; i < cartItems.length; i++) {
       let total = cartItems[i].quantity * cartItems[i].pricePerItem;
@@ -126,14 +143,13 @@ class Cart {
         : 0;
 
     let couponValue = 0;
-    if (result.couponApplied) {
+    if (couponApplied) {
       const coupon = await CouponModel.findOne({
-        _id: result.couponApplied,
+        _id: couponApplied,
         isActive: true,
       }).select("couponValue");
       couponValue = coupon["couponValue"];
     }
-
     totalPrice = totalPrice - (membershipDiscount + couponValue);
     return totalPrice;
   }
@@ -141,10 +157,9 @@ class Cart {
   static async decreaseItemQuantity(req, res, next) {
     try {
       const userId = req.payload.aud;
-
       const { serviceCategoryId, serviceSubCategoryId, quantity } = req.body;
 
-      if (quantity === 0) {
+      if (quantity <= 0) {
         return await Cart.deleteItemFromCart(req, res, next);
       }
 
@@ -183,7 +198,6 @@ class Cart {
       }
 
       const message = "Item successfully deleted!!!";
-
       res.sendResponse(message, 204, true);
     } catch (error) {
       next(error);
@@ -193,7 +207,6 @@ class Cart {
   static async deleteCart(req, res, next) {
     try {
       const userId = req.payload.aud;
-
       const { serviceCategoryId } = req.body;
 
       const deletedCart = await CartModel.findOneAndDelete({

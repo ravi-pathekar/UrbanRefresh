@@ -4,6 +4,8 @@ const Cart = require("./cart");
 
 router.post("/v1/addToCart", Cart.addToCart);
 
+router.get("/v1/getCart/:serviceCategoryId", Cart.getCart);
+
 router.delete("/v1/deleteItemFromCart", Cart.deleteItemFromCart);
 
 router.delete("/v1/deleteCart", Cart.deleteCart);
